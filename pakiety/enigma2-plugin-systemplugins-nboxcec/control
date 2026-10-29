@@ -1,0 +1,9 @@
+Package: enigma2-plugin-systemplugins-nboxcec
+Version: @WERSJA@
+Description: nBox CEC - nBox and TV over HDMI-CEC (TV state and input, box <-> TV actions)
+Section: extra
+Priority: optional
+Maintainer: Kofec <18610805+kofec@users.noreply.github.com>
+Architecture: all
+Depends: enigma2
+Source: https://github.com/kofec/nbox-sh4 enigma2/NBoxCEC

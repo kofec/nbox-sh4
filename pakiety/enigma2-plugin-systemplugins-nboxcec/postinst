@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# skompilowane stare wersje - enigma zbuduje nowe przy starcie
+rm -f /usr/lib/enigma2/python/Plugins/SystemPlugins/NBoxCEC/*.pyo \
+	/usr/lib/enigma2/python/Plugins/SystemPlugins/NBoxCEC/*.pyc
+echo "nBox CEC: zrestartuj enigme (menu albo OpenWebif /web/powerstate?newstate=3)"
+
+exit 0

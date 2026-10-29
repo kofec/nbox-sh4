@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# opkg z sesji ssh dziedziczy PATH bez /sbin (2026-10-22)
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:$PATH
+
+chkconfig --add nbox_cec
+# restart, nie start: opkg 0.2.4 przy aktualizacji nie wola prerm starej wersji
+/etc/init.d/nbox_cec restart
+if grep -q "^cec_ctrl " /proc/modules; then
+	echo "nbox_cec: cec_ctrl nie zwalnia nozki ani IRQ - zrestartuj box (na stale bez cec_ctrl)"
+fi
+
+exit 0

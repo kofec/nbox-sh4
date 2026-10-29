@@ -1,0 +1,9 @@
+Package: kernel-module-cec-rx
+Version: 1.2.1
+Description: HDMI-CEC receive (sniffer) on PIO 4.4 for nBox ADB 5800, /proc/cec_rx
+Section: kernel
+Priority: optional
+Maintainer: Kofec <18610805+kofec@users.noreply.github.com>
+Architecture: adb5800xx
+Depends: kernel-core-default-gos
+Source: https://github.com/kofec/nbox-sh4 sh4/cec_rx

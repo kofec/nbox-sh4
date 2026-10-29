@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# chkconfig: 5 39 61
+# cec_rx - podsluch HDMI-CEC na PIO 4.4 (/proc/cec_rx) dla wtyczki nBox CEC.
+# Pakiet kernel-module-cec-rx, zrodla: https://github.com/kofec/nbox-sh4 sh4/cec_rx
+# S39: po gstm (S38), ktory laduje cec_ctrl (nadawanie), przed enigma.
+
+MOD=/lib/modules/cec_rx.ko
+
+zaladowany() {
+	grep -q "^cec_rx " /proc/modules
+}
+
+case "$1" in
+start)
+	zaladowany || /sbin/insmod $MOD
+	;;
+stop)
+	zaladowany && /sbin/rmmod cec_rx
+	;;
+restart)
+	$0 stop
+	$0 start
+	;;
+status)
+	if zaladowany; then
+		grep "^#" /proc/cec_rx
+	else
+		echo "cec_rx nie zaladowany"
+	fi
+	;;
+*)
+	echo "uzycie: $0 start|stop|restart|status"
+	exit 1
+	;;
+esac
+exit 0

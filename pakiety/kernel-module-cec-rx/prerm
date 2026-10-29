@@ -1,0 +1,8 @@
+#!/bin/sh
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:$PATH
+
+/etc/init.d/cec_rx stop
+chkconfig --del cec_rx
+
+exit 0

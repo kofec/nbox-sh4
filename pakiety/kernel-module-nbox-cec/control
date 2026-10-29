@@ -1,0 +1,10 @@
+Package: kernel-module-nbox-cec
+Version: @WERSJA@
+Description: HDMI-CEC for nBox ADB 5800: receive, ACK, replies (OSD name nBox), transmit, TV remote keys
+Section: kernel
+Priority: optional
+Maintainer: Kofec <18610805+kofec@users.noreply.github.com>
+Architecture: adb5800xx
+Depends: kernel-core-default-gos
+Conflicts: kernel-modules-cec-gos, kernel-module-cec-rx
+Source: https://github.com/kofec/nbox-sh4 sh4/nbox_cec

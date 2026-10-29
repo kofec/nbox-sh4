@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# opkg z sesji ssh dziedziczy PATH bez /sbin - chkconfig "not found" (2026-10-22)
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:$PATH
+
+chkconfig --add cec_rx
+# restart, nie start: opkg 0.2.4 przy aktualizacji nie wola prerm starej
+# wersji, wiec zostawal stary modul w pamieci (1.0 -> 1.2)
+/etc/init.d/cec_rx restart
+
+exit 0

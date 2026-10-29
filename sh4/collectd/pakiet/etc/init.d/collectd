@@ -1,0 +1,54 @@
+#!/bin/sh
+#
+# chkconfig:	35 60 40
+# collectd - statystyki nBoxa do collectd routera (pakiet collectd-nbox).
+# Start po network (S32) i ntpd (S34); skok zegara z 2000-01-01 po NTP
+# obsluguje latka 320.
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+CONF=/etc/collectd.conf
+PID=/tmp/collectd.pid
+# temperatura dysku od nbox_monitor.sh dla pluginu table
+TAB=/tmp/collectd_nbox.tab
+
+dziala()
+{
+	[ -f $PID ] && kill -0 "$(cat $PID)" 2>/dev/null
+}
+
+case "$1" in
+	start)
+		if grep -q '^Hostname "ZMIEN_MNIE"' $CONF; then
+			echo "collectd: ustaw Hostname w $CONF"
+			exit 1
+		fi
+		dziala && exit 0
+		[ -e $TAB ] || : > $TAB
+		/usr/sbin/collectd -t -C $CONF || exit 1
+		start-stop-daemon --start --quiet --pidfile $PID \
+			--exec /usr/sbin/collectd -- -C $CONF -P $PID
+		echo "collectd wlaczony"
+	;;
+	stop)
+		start-stop-daemon --stop --quiet --oknodo --pidfile $PID
+		rm -f $PID
+		echo "collectd wylaczony"
+	;;
+	restart)
+		$0 stop
+		sleep 1
+		$0 start
+	;;
+	status)
+		if dziala; then
+			echo "collectd dziala (PID $(cat $PID))"
+		else
+			echo "collectd nie dziala"
+			exit 1
+		fi
+	;;
+	*)
+		echo "uzycie: $0 start|stop|restart|status"
+		exit 1
+	;;
+esac

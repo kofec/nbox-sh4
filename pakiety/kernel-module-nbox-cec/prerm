@@ -1,0 +1,8 @@
+#!/bin/sh
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:$PATH
+
+/etc/init.d/nbox_cec stop
+chkconfig --del nbox_cec
+
+exit 0

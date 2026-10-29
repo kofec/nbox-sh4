@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# pusty katalog po usunieciu (przy aktualizacji zostaja nowe pliki - rmdir nic nie zrobi)
+rmdir /usr/lib/enigma2/python/Plugins/SystemPlugins/NBoxCEC 2>/dev/null
+
+exit 0

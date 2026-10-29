@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# opkg uruchamia skrypty bez /sbin w PATH - samo chkconfig to "not found"
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+chkconfig --add collectd
+# Przy pierwszej instalacji Hostname to ZMIEN_MNIE - init tylko o tym przypomni
+[ -z "$OPKG_OFFLINE_ROOT" ] && /etc/init.d/collectd restart
+exit 0

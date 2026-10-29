@@ -1,0 +1,21 @@
+# drzewo jadra, klony i logi z przygotuj_jadro.sh
+/build/
+# wyniki kbuild
+*.o
+*.ko
+*.mod.c
+.*.cmd
+.tmp_versions/
+modules.order
+Module.symvers
+# collectd
+/sh4/collectd/collectd-*.tar.bz2
+/sh4/collectd/build-*/
+/sh4/collectd/inst/
+/sh4/collectd/ipk-tmp/
+*.ipk
+# testy na PC
+/sh4/cec_rx/test_dekoder
+/sh4/nbox_cec/test_protokol
+*.exe
+__pycache__/

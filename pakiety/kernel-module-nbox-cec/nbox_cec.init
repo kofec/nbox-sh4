@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# chkconfig: 5 39 61
+# nbox_cec - HDMI-CEC nBoxa (odbior, ACK, odpowiedzi, nadawanie, pilot TV):
+# /proc/cec_rx, /proc/nbox_cec, /proc/nbox_cec_klawisze, /proc/stb/hdmi/cec.
+# Pakiet kernel-module-nbox-cec, zrodla: https://github.com/kofec/nbox-sh4 sh4/nbox_cec
+# S39: po gstm (S38, e2_proc), przed enigma. Zastepuje cec_ctrl (pakiet
+# kernel-modules-cec-gos) i cec_rx - bez cec_ctrl.ko gstm nic nie laduje.
+
+MOD=/lib/modules/nbox_cec.ko
+
+zaladowany() {
+	grep -q "^nbox_cec " /proc/modules
+}
+
+case "$1" in
+start)
+	zaladowany || /sbin/insmod $MOD
+	if grep -q "^cec_ctrl " /proc/modules; then
+		echo "nbox_cec: cec_ctrl zaladowany - praca wspolna do restartu boxa"
+	fi
+	;;
+stop)
+	zaladowany && /sbin/rmmod nbox_cec
+	;;
+restart)
+	$0 stop
+	$0 start
+	;;
+status)
+	if zaladowany; then
+		head -3 /proc/nbox_cec
+	else
+		echo "nbox_cec nie zaladowany"
+	fi
+	;;
+*)
+	echo "uzycie: $0 start|stop|restart|status"
+	exit 1
+	;;
+esac
+exit 0

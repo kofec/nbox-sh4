@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# .pyo/.pyc nie sa w pakiecie - opkg ich nie usunie
+rm -f /usr/lib/enigma2/python/Plugins/SystemPlugins/NBoxCEC/*.pyo \
+	/usr/lib/enigma2/python/Plugins/SystemPlugins/NBoxCEC/*.pyc
+
+exit 0
