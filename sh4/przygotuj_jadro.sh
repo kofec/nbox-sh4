@@ -6,10 +6,10 @@
 #
 #   docker run --rm -v "$PWD":/work nbox-sh4:4.8.4 sh /work/sh4/przygotuj_jadro.sh
 #
-# Sam klonuje do /work/build (jesli jeszcze nie ma):
+# Sam pobiera do /work/build (jesli jeszcze nie ma):
 #   linux.git    - https://github.com/Duckbox-Developers/linux-sh4-2.6.32.71
-#                  (galaz stmicro, rewizja REV)
-#   audioniek-bs - https://github.com/Audioniek/buildsystem (rewizja BS_REV)
+#                  (galaz stmicro, tylko rewizja REV)
+#   audioniek-bs - https://github.com/Audioniek/buildsystem (tylko rewizja BS_REV)
 # Konfiguracja: sh4/config-graterlia-2.6.32.61_stm24_0217 = zcat /proc/config.gz
 # z nBoxa (md5 198db3da, ta sama na pieciu boxach, 2026-10-21).
 #
@@ -58,19 +58,27 @@ linux-sh4-pcm_noise_fix_stm24_$L.patch
 "
 M="ARCH=sh CROSS_COMPILE=sh4-linux-"
 
+# pobierz <katalog> <url> <rewizja> - tylko ta jedna rewizja (--depth 1, pelna
+# historia linux-sh4 to ~340 MB), do trzech prob przy zerwanym polaczeniu
+pobierz() {
+    [ -d "$1" ] || git init -q "$1"
+    n=0
+    until git -C "$1" cat-file -e "$3^{commit}" 2>/dev/null; do
+        n=$((n + 1))
+        [ $n -le 3 ] || { echo "nie pobrano $2 $3"; exit 1; }
+        git -C "$1" fetch -q --depth 1 "$2" "$3" || sleep 10
+    done
+}
+
 mkdir -p "$B"
-if [ ! -d "$B/linux.git" ]; then
-    git clone -n -b stmicro https://github.com/Duckbox-Developers/linux-sh4-2.6.32.71.git "$B/linux.git"
-fi
-if [ ! -d "$B/audioniek-bs" ]; then
-    git clone -n https://github.com/Audioniek/buildsystem.git "$B/audioniek-bs"
-    git -C "$B/audioniek-bs" -c advice.detachedHead=false checkout -q "$BS_REV"
-fi
+pobierz "$B/linux.git" https://github.com/Duckbox-Developers/linux-sh4-2.6.32.71.git "$REV"
+pobierz "$B/audioniek-bs" https://github.com/Audioniek/buildsystem.git "$BS_REV"
+git -C "$B/audioniek-bs" -c advice.detachedHead=false checkout -q "$BS_REV"
 
 rm -rf "$DST"
-git -c advice.detachedHead=false clone -q "$B/linux.git" "$DST"
+mkdir -p "$DST"
+git -C "$B/linux.git" archive "$REV" | tar -x -C "$DST"
 cd "$DST"
-git checkout -q "$REV"
 
 for p in $PATCHES; do
     f=

@@ -74,7 +74,7 @@ Potrzebny Linux x86_64 z Dockerem. Wszystkie polecenia z katalogu repo.
 # 1. toolchain (pobiera RPM-y z Duckbox-Developers/stlinux i sprawdza sha256)
 docker build -t nbox-sh4:4.8.4 sh4
 
-# 2. drzewo jadra (klonuje linux-sh4 i buildsystem Audionieka do build/,
+# 2. drzewo jadra (pobiera linux-sh4 i buildsystem Audionieka do build/,
 #    naklada 27 latek, konfiguracja z sh4/config-graterlia-*, modules_prepare)
 docker run --rm -v "$PWD":/work nbox-sh4:4.8.4 sh /work/sh4/przygotuj_jadro.sh
 
