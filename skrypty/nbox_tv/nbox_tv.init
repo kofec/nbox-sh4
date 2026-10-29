@@ -1,0 +1,56 @@
+#!/bin/sh
+# nbox_tv - start/stop nbox_tv.sh (nBox zasypia i budzi sie razem z TV).
+#
+# Instalacja (GraterliaOS, nBox ADB 5800):
+#   /root/nbox_tv.sh       (chmod 755)
+#   /root/nbox_tv.conf     (z nbox_tv.conf.example, opcjonalnie)
+#   /etc/init.d/nbox_tv    (chmod 755)
+#   w /etc/rc.local linia: /etc/init.d/nbox_tv start
+#
+# Bez linkow K.. w rc0.d/rc6.d: przy wylaczaniu skrypt najwyzej nie dostanie
+# odpowiedzi z enigmy i nic nie zrobi.
+
+SKRYPT=/root/nbox_tv.sh
+PIDF=/tmp/nbox_tv.pid
+
+zatrzymaj() {
+	p=$(cat $PIDF 2>/dev/null)
+	[ -z "$p" ] && return
+	kill $p 2>/dev/null
+	i=0
+	while kill -0 $p 2>/dev/null; do
+		i=$(expr $i + 1)
+		if [ $i -ge 10 ]; then
+			kill -9 $p 2>/dev/null
+			break
+		fi
+		sleep 1
+	done
+	rm -f $PIDF
+}
+
+case $1 in
+start)
+	p=$(cat $PIDF 2>/dev/null)
+	if [ -n "$p" ] && kill -0 $p 2>/dev/null; then
+		echo "nbox_tv already running ($p)"
+		exit 0
+	fi
+	setsid $SKRYPT > /dev/null 2>&1 < /dev/null &
+	echo nbox_tv started
+	;;
+stop)
+	zatrzymaj
+	echo nbox_tv stopped
+	;;
+restart)
+	zatrzymaj
+	$0 start
+	;;
+*)
+	echo "uzycie: $0 start|stop|restart"
+	exit 1
+	;;
+esac
+
+exit 0

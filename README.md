@@ -17,6 +17,9 @@ W środku:
 | [enigma2/NBoxCEC](enigma2/NBoxCEC) | wtyczka enigmy **nBox CEC**: stan TV i wybrane wejście, budzenie / usypianie boxa wg TV, włączanie / wyłączanie TV wg boxa, pilot TV |
 | [pakiety](pakiety) | pliki `control` / skrypty i [zbuduj_ipk.py](pakiety/zbuduj_ipk.py), który składa z tego pakiety `.ipk` dla opkg 0.2.4 |
 | [sh4/collectd](sh4/collectd) | **collectd 5.12.0** na nBoxa (CPU, RAM, dyski, sieć) wysyłający statystyki do routera, np. OpenWrt z `luci-app-statistics` |
+| [skrypty/nbox_tv](skrypty/nbox_tv) | `nbox_tv.sh` — box zasypia i budzi się razem z TV bez wtyczki CEC: z linii hotplug HDMI, Sony Simple IP Control, pingu albo podsłuchu `/proc/cec_rx` |
+| [skrypty](skrypty) | `mount_hdd.sh` (dysk, który po starcie przez kilkanaście minut nie odpowiada), `nbox_klawisze.py` (log klawiszy pilota z `lircd`) |
+| [docs/graterlia.md](docs/graterlia.md) | **notatki o GraterliaOS**: dostęp, start i wyłączanie, zegar, dysk, wentylator, OpenWebif, HDMI i CEC |
 
 Działa od października 2026 na czterech nBoxach (BSLA i BSKA) z telewizorami
 LG (starszy i webOS) oraz Sony BRAVIA (z soundbarem i bez).
@@ -170,6 +173,20 @@ dysku z `/tmp/collectd_nbox.tab` (`sda 45`) — pisze ją
 [nbox_monitor.sh](https://github.com/kofec/Domoticz-Enigma2/blob/master/nbox/nbox_monitor.sh),
 bez niego plik zostaje pusty.
 
+## Zobacz też
+
+- [kofec/Domoticz-Enigma2](https://github.com/kofec/Domoticz-Enigma2) — wtyczka
+  Domoticza (Python) do odbiorników Enigma2 przez OpenWebif. W katalogu
+  [nbox](https://github.com/kofec/Domoticz-Enigma2/tree/master/nbox)
+  `nbox_monitor.sh`: monitor nBoxa (sygnał, ECM i błędy oscama, zatrzymania
+  obrazu, wentylator wg temperatury dysku), który wysyła to do Domoticza.
+- [kofec/domoticz, gałąź `openwrt`](https://github.com/kofec/domoticz/tree/openwrt) —
+  Domoticz z natywnym sprzętem **Enigma2** w C++ (zamiast wtyczki Python, dla
+  routerów z małą ilością RAM-u), z tymi samymi urządzeniami monitora nBoxa.
+  Pakiet dla OpenWrt: [kofec/Domoticz-Openwrt, gałąź `domoticz-ng-fork`](https://github.com/kofec/Domoticz-Openwrt/tree/domoticz-ng-fork)
+  (`utils/domoticz-ng`). Do głównego Domoticza nie weszło
+  ([domoticz/domoticz#7164](https://github.com/domoticz/domoticz/pull/7164)).
+
 ## Skąd co jest
 
 - Toolchain: RPM-y STLinux 2.4 z [Duckbox-Developers/stlinux](https://github.com/Duckbox-Developers/stlinux).
@@ -210,6 +227,15 @@ Build kit for **nBox ADB 5800** set-top boxes (STi7100, sh4) running
 - **nBox CEC**, an enigma2 plugin that wakes / puts the box to standby following
   the TV and switches the TV on / off following the box;
 - **collectd 5.12.0** for the box, sending stats to a router's collectd.
+- `skrypty/`: `nbox_tv.sh` (box follows the TV without the CEC plugin: HDMI
+  hotplug, Sony Simple IP Control, ping or CEC sniffing), `mount_hdd.sh`,
+  `nbox_klawisze.py` (remote key logger on the lircd socket);
+- `docs/graterlia.md`: notes on GraterliaOS (SSH with ssh-rsa only, boot and
+  shutdown order, the 2000-01-01 clock, disk spin-up, fan, OpenWebif, HDMI/CEC).
+
+See also [kofec/Domoticz-Enigma2](https://github.com/kofec/Domoticz-Enigma2)
+(Domoticz plugin and `nbox_monitor.sh`) and the native Enigma2 hardware in
+[kofec/domoticz `openwrt`](https://github.com/kofec/domoticz/tree/openwrt).
 
 Build steps are in the *Budowanie* section above; the commands work as they
 are. Comments in the code are in Polish.

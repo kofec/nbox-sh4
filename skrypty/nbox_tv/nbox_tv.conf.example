@@ -1,0 +1,39 @@
+# /root/nbox_tv.conf - ustawienia nbox_tv.sh (czyta je jako skrypt sh).
+# Bez tego pliku: TV_ZRODLO=hotplug i domyslne czasy z naglowka nbox_tv.sh.
+# Ponizej warianty, ktore dzialaly z konkretnymi telewizorami - zostaw jeden.
+
+# --- A. TV puszcza hotplug HDMI w standby (np. plazma LG 50PJ250) ---
+# TV_ZRODLO=hotplug
+
+# --- B. Sony, ktory trzyma hotplug w standby: Simple IP Control ---
+# W TV: Ustawienia -> Siec -> Proste sterowanie IP (bez klucza). Adres TV
+# najlepiej z rezerwacja DHCP na routerze.
+# TV_ZRODLO=sony
+# TV_IP=192.168.1.50
+# TV_PORT=20060
+
+# --- C. CEC z /proc/cec_rx (modul nbox_cec albo cec_rx), hotplug jako zapas ---
+# TV_ZRODLO=cec
+# TV_ZAPAS=hotplug
+# cokolwiek od TV (adres 0) = wlaczony
+# CEC_ZYJE='^0>'
+# CEC_ZYJE_S=60
+
+# --- D. LG webOS: CEC (odpytywanie 0>1..0>E co ~15 s), ping jako zapas ---
+# W standby LG nadaje tylko Vendor ID 0>F 87, wiec CEC_ZYJE na samo odpytywanie.
+# TV_ZRODLO=cec
+# TV_ZAPAS=ping
+# TV_IP=192.168.1.51
+# CEC_ZYJE='^0>[1-9A-E] 0[1-9a-e]-'
+# CEC_ZYJE_S=60
+# TV_OFF_PO=30
+# STANDBY_PO=300
+
+# --- E. Sony z soundbarem (eARC): TV co 60 s pyta soundbar o zasilanie ---
+# Po wylaczeniu jeszcze ~65 s rozmowy z soundbarem (CEC_PO_WYL, dom. 90 s).
+# TV_ZRODLO=cec
+# CEC_ZYJE='^0>'
+# CEC_ZYJE_S=150
+
+# Diagnostyka - kazda zmiana ping/hotplug/tmds_status do pliku:
+# DIAG_LOG=/tmp/nbox_tv_diag.log
