@@ -1,0 +1,70 @@
+diff -ru a/arch/sh/boards/mach-mb442/setup.c b/arch/sh/boards/mach-mb442/setup.c
+--- a/arch/sh/boards/mach-mb442/setup.c
++++ b/arch/sh/boards/mach-mb442/setup.c
+@@ -47,7 +47,7 @@
+ 	{
+ 		.name  = "LMI_VID",
+ 		.start = 0x10800000,
+-		.size  = 0x02C00000,  // 44 Mbyte
++		.size  = 0x03800000,  // 56 Mbyte jak w Graterlii
+ 		.flags = 0,
+ 		.aka   = LMI_VID_partalias
+ 	},
+@@ -60,8 +60,8 @@
+ //	},
+ 	{
+ 		.name  = "LMI_SYS",
+-		.start = 0x05000000,  // 80 Mbyte
+-		.size  = 0x02000000,  // 32 Mbyte
++		.start = 0,           // z bootmem za jadrem, jak w Graterlii
++		.size  = 0x01C00000,  // 28 Mbyte
+ 		.flags = 0,
+ 		.aka   = LMI_SYS_partalias
+ 	}
+@@ -202,7 +202,7 @@
+ static struct platform_device *iti_5800_devices[] __initdata =
+ {
+ 	&iti_5800_smc91x_device,
+-	&iti_5800_nor_device,
++//	&iti_5800_nor_device,  // Graterlia nie rejestruje NOR - mtd0 to rootfs
+ // uncomment next line if you want NAND configuration through a device
+ //	&iti_5800_nand_device,
+ };
+diff -ru a/arch/sh/kernel/setup.c b/arch/sh/kernel/setup.c
+--- a/arch/sh/kernel/setup.c
++++ b/arch/sh/kernel/setup.c
+@@ -420,34 +420,6 @@
+ #endif
+ #endif
+ 
+-	{  // change command line supplied by boot loader to desired one; inserted suplied MAC
+-		int command_line_len = strlen(command_line);
+-		char org_command_line[] = "console=ttyAS0,115200 root=/dev/mtdblock0 rw rootfstype=jffs2";
+-		char new_command_line[] = "console=ttyAS0,115200 ubi.mtd=3 root=ubi0:rootfs rootfstype=ubifs rw init=/bin/devinit mem=128m coprocessor_mem=4m@0x10000000,4m@0x10400000 nwhwconf=device:eth0,hwaddr:";
+-		char mac[] = "12:34:56:78:9A:BC";
+-		int org_command_line_len = strlen(org_command_line);
+-		int i;
+-
+-		for (i = 0; i < (command_line_len - 7); i++)
+-		{
+-			if (!strncmp(command_line + i, "ethaddr", 7))
+-			{
+-				strlcpy(mac, command_line + i + 8, sizeof(mac));
+-				break;
+-			}
+-			if (!strncmp(command_line + i, "hwaddr", 6))
+-			{
+-				strlcpy(mac, command_line + i + 7, sizeof(mac));
+-				break;
+-			}
+-		}
+-		if (command_line_len >= org_command_line_len && !strncmp(command_line, org_command_line, org_command_line_len))
+-		{
+-			strlcpy(command_line, new_command_line, sizeof(new_command_line));
+-			strlcat(command_line, mac, sizeof(mac));
+-		}
+-	}
+-
+ 	/* Save unparsed command line copy for /proc/cmdline */
+ 	memcpy(boot_command_line, command_line, COMMAND_LINE_SIZE);
+ 	*cmdline_p = command_line;
