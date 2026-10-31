@@ -17,7 +17,7 @@ W środku:
 | [enigma2/NBoxCEC](enigma2/NBoxCEC) | wtyczka enigmy **nBox CEC**: stan TV i wybrane wejście, budzenie / usypianie boxa wg TV, włączanie / wyłączanie TV wg boxa, pilot TV |
 | [pakiety](pakiety) | pliki `control` / skrypty i [zbuduj_ipk.py](pakiety/zbuduj_ipk.py), który składa z tego pakiety `.ipk` dla opkg 0.2.4 |
 | [sh4/collectd](sh4/collectd) | **collectd 5.12.0** na nBoxa (CPU, RAM, dyski, sieć) wysyłający statystyki do routera, np. OpenWrt z `luci-app-statistics` |
-| [sh4/zbuduj_jadro_printk.sh](sh4/zbuduj_jadro_printk.sh) | **jądro z `dmesg`** do startu z pendrive'a, moduły z obrazu działają bez przebudowy; opis w [docs/graterlia.md](docs/graterlia.md#dmesg) |
+| [sh4/zbuduj_jadro_printk.sh](sh4/zbuduj_jadro_printk.sh) | **jądro z `dmesg`** do startu z pendrive'a lub z NAND, moduły z obrazu działają bez przebudowy; opis w [docs/graterlia.md](docs/graterlia.md#dmesg) |
 | [skrypty/nbox_tv](skrypty/nbox_tv) | `nbox_tv.sh` — box zasypia i budzi się razem z TV bez wtyczki CEC: z linii hotplug HDMI, Sony Simple IP Control, pingu albo podsłuchu `/proc/cec_rx` |
 | [skrypty](skrypty) | `mount_hdd.sh` (dysk, który po starcie przez kilkanaście minut nie odpowiada), `nbox_klawisze.py` (log klawiszy pilota z `lircd`) |
 | [docs/graterlia.md](docs/graterlia.md) | **notatki o GraterliaOS**: dostęp, start i wyłączanie, zegar, dysk, wentylator, OpenWebif, HDMI i CEC |
@@ -230,8 +230,8 @@ Build kit for **nBox ADB 5800** set-top boxes (STi7100, sh4) running
   the TV and switches the TV on / off following the box;
 - **collectd 5.12.0** for the box, sending stats to a router's collectd;
 - `sh4/zbuduj_jadro_printk.sh`: a kernel with `printk` (the stock one has none, so
-  `dmesg` is empty) that boots from a USB stick; stock modules load unchanged, NAND
-  is not visible from it (`docs/graterlia.md`, section *dmesg*);
+  `dmesg` is empty) that boots from a USB stick or NAND; stock modules load unchanged,
+  NAND driver rebuilt from the stock binary (`docs/graterlia.md`, section *dmesg*);
 - `skrypty/`: `nbox_tv.sh` (box follows the TV without the CEC plugin: HDMI
   hotplug, Sony Simple IP Control, ping or CEC sniffing), `mount_hdd.sh`,
   `nbox_klawisze.py` (remote key logger on the lircd socket);

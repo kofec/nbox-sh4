@@ -18,19 +18,25 @@
 # - NOR z u-bootem jako mtd0-2 (w Graterlii mtd0 = rootfs, mtd1 = kernel;
 #   skrypty Graterlii piszace do /dev/mtd0 skasowalyby u-boota),
 # - BPA2: LMI_VID 56 MB, LMI_SYS 28 MB z bootmem (Audioniek 44 MB / 32 MB stale).
-# NAND tego jadra nie widzi (/proc/mtd pusty): plik plyty konfiguruje
-# stm_nand_emi, a w configu Graterlii MTD_NAND_STM_EMI jest wylaczone.
+# Bez NAND= jadro nie widzi NAND (/proc/mtd pusty).
 #
 # ROOT (opcjonalnie) dopisuje do cmdline z u-boota "root=... rootfstype=ext3
 # rootdelay=10 rw" - kernel bierze ostatnie root=, wiec wpis menu u-boota nie
 # musi go znac. Pendrive jest sdb na boxie z dyskiem SATA, sda bez dysku. Takie
 # jadro startuje tylko z tego pendrive'a - nie do NAND.
+#
+# NAND=ro: latki/graterlia_gen_nand.patch daje NAND jak w jadrze Graterlii
+# (gen_nand, bank 1, CLE A17, ALE A16, nCE PIO 3.6, R/B PIO 4.5, ECC programowe,
+# tablica zlych blokow w RAM-ie), a partycjom odbiera prawo zapisu (mask_flags).
+# NAND=rw to samo z zapisem, bez ROOT startuje z NAND i z pendrive'a (root= podaje
+# wpis u-boota). Drzewo w build/jadro-nand, reszta polecen bez zmian.
 
 set -e
 
 M="ARCH=sh CROSS_COMPILE=sh4-linux-"
 B=/work/build
 DST=$B/jadro-printk
+[ -z "$NAND" ] || DST=$B/jadro-nand
 
 [ -d "$B/linux-2.6.32.61_stm24_0217" ] || { echo "BRAK drzewa - najpierw przygotuj_jadro.sh"; exit 1; }
 # CONFIG_EXTRA_FIRMWARE_DIR="../integrated_firmware/" - wzgledem drzewa jadra
@@ -45,6 +51,13 @@ sed -i -e 's/^# CONFIG_PRINTK is not set/CONFIG_PRINTK=y/' \
        -e 's/^CONFIG_LOG_BUF_SHIFT=.*/CONFIG_LOG_BUF_SHIFT=16/' .config
 if [ -n "$ROOT" ]; then
     sed -i "s|^# CONFIG_CMDLINE_EXTEND is not set|CONFIG_CMDLINE_EXTEND=y\nCONFIG_CMDLINE=\"root=$ROOT rootfstype=ext3 rootdelay=10 rw\"|" .config
+fi
+if [ -n "$NAND" ]; then
+    patch -p1 -i /work/sh4/latki/graterlia_gen_nand.patch
+fi
+if [ "$NAND" = ro ]; then
+    sed -i '/^static struct mtd_partition iti_5800_nand_parts/,/^};/ s/^\(\s*\)\.name.*$/&\n\1.mask_flags   = MTD_WRITEABLE,/' arch/sh/boards/mach-mb442/setup.c
+    [ "$(grep -c 'mask_flags   = MTD_WRITEABLE' arch/sh/boards/mach-mb442/setup.c)" = 2 ] || { echo "BRAK mask_flags"; exit 1; }
 fi
 yes "" | make $M oldconfig > "$B/jadro-printk-oldconfig.log" 2>&1
 sed -i 's/^# CONFIG_PRINTK_TIME is not set/CONFIG_PRINTK_TIME=y/' .config

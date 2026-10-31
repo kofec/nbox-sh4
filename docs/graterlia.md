@@ -117,20 +117,52 @@ jądro, a moduły z obrazu (player2, stmdvb…) ładują się na nim bez przebud
 Budowanie: [sh4/zbuduj_jadro_printk.sh](../sh4/zbuduj_jadro_printk.sh) (polecenia
 w nagłówku), nagłówek uImage dopisuje [sh4/mkimage_sh4.py](../sh4/mkimage_sh4.py).
 Kosztuje 320 kB RAM-u (`MemTotal` 98 460 → 98 140 kB), reszta zajętości bez zmian.
+Warianty: `ROOT=/dev/sdb1` wymusza `root` z pendrive'a, `NAND=ro` / `NAND=rw`
+włączają NAND tylko do odczytu albo z zapisem. `NAND=rw` bez `ROOT` startuje z NAND
+i z pendrive'a, bo `root=` podaje wpis u-boota.
 
 Plik płyty z łatek Audionieka **nie jest** tym z Graterlii i bez
 [sh4/latki/graterlia_zgodnosc.patch](../sh4/latki/graterlia_zgodnosc.patch) jest
 groźny: zamienia `root` z u-boota na UBI, rejestruje NOR z u-bootem jako `mtd0`
 (skrypty Graterlii piszące do `/dev/mtd0` skasowałyby u-boota) i inaczej dzieli
-pamięć BPA2. Mimo łatki to jądro **nie widzi NAND** (`/proc/mtd` pusty, w konfiguracji
-Graterlii nie ma sterownika `stm_nand_emi`, którego używa ten plik płyty), więc
-nadaje się tylko do startu z pendrive'a. NAND jest wtedy bezpieczny, ale backup
-i flashowanie NAND z tego systemu nie zadziałają.
+pamięć BPA2. Bez `NAND=` to jądro nie widzi NAND (`/proc/mtd` puste).
 
-Pendrive: u-boot czyta ext2/ext3 tylko z inode'ami 128 B, a `mke2fs` z boxa
-domyślnie daje 256, więc trzeba podać to wprost. Kopia działającego systemu z NAND,
-z jądrem wgranym wcześniej do `/tmp/uImage` (`sdb1` to przykład, **sprawdź
-najpierw `lsblk`**: format kasuje partycję):
+### NAND
+
+[sh4/latki/graterlia_gen_nand.patch](../sh4/latki/graterlia_gen_nand.patch) odtwarza
+obsługę NAND z binarki Graterlii, bo jej źródeł nikt nie opublikował: `gen_nand` na
+banku EMI 1, ALE = A16, CLE = A17, nCE = PIO 3.6, R/B = PIO 4.5, ECC programowe
+(OOB 0–3, 6–7), układ ST NAND512 (64 MB, strona 512 B). **Pułapka:** odczyt idzie
+przez `0xA0400000`, a zapis i komendy przez `0xA0800000`, bo A22 to nW, a A23 to nR.
+Bez tego `dmesg` mówi `No NAND device found`.
+
+Sterownik jest sprawdzony na jednym boxie (BSLA). **Na NAND działa od 2026-10-31,
+więc długiej pracy z zapisem `jffs2` jeszcze nie sprawdzono.** Przed wgraniem zrób
+kopię, najlepiej z `NAND=ro` z pendrive'a, porównując pliki z `jffs2 -o ro`:
+
+```sh
+/usr/sbin/nanddump -o -f /hdd/mtd0_oob.bin /dev/mtd0   # dump bez złych bloków
+/usr/sbin/nanddump -o -f /hdd/mtd1_oob.bin /dev/mtd1
+```
+
+Wgranie samego jądra, ze startu z pendrive'a na jądrze `NAND=rw` (rootfs zostaje).
+Ze startu z NAND nie ruszaj `mtd0`, bo to działający system:
+
+```sh
+/usr/sbin/flash_eraseall /dev/mtd1
+/usr/sbin/nandwrite -p /dev/mtd1 /boot/uImage-nand-rw
+```
+
+Powrót: ten sam zapis oryginalnego `uImage.gz`. Sprawdź długość odczytu w u-boocie:
+środowiska Freebox/B4team czytają jądro przez `nand read.i 0xa5000000 0x3c00000
+0x300000`, czyli najwyżej 3 MB (nasze ma 1,83 MB).
+
+### Pendrive
+
+u-boot czyta ext2/ext3 tylko z inode'ami 128 B, a `mke2fs` z boxa domyślnie daje
+256, więc trzeba podać to wprost. Kopia działającego systemu z NAND, z jądrem
+wgranym wcześniej do `/tmp/uImage` (`sdb1` to przykład, **sprawdź najpierw `lsblk`**:
+format kasuje partycję):
 
 ```sh
 mkfs.ext3 -I 128 -b 4096 -L Graterlia1 /dev/sdb1
@@ -145,12 +177,8 @@ cd / && sync && umount /tmp/usb /tmp/nand
 
 Kopia przez `bind` zabiera też `/dev` z NAND, którego zwykły `tar` z `/` by nie
 ruszył. Start: wpis USB w menu u-boota (`ext2load usb 0:N a5000000 /boot/uImage`).
-W `/proc/cmdline` wpis USB na naszym boxie podaje już `root=/dev/sdb1`, a jądro
-zbudowane z `ROOT=` wymusza to samo niezależnie od u-boota. Gdy jądro stanie:
-wyjąć pendrive i odciąć prąd, box wraca na NAND.
-
-Sprawdzone na jednym boxie: start z USB, oba tunery, enigma2, oscam, powrót po
-odcięciu prądu.
+Wpisy menu robią `saveenv`, więc wybór zostaje domyślny: **po wyjęciu pendrive'a box
+nie musi wrócić na NAND**, powrót to wybór wpisu strzałkami przy boxie (3 s).
 
 ## HDMI i CEC
 
