@@ -67,6 +67,9 @@ Większość nie jest nigdzie opisana, a kosztowała po kilka godzin szukania.
   ```
 - Pliki i logi z datą `20000101` to rzeczy zapisane przed ustawieniem zegara.
   collectd z tego repo ma łatkę OpenWrt na skok czasu po starcie.
+- `/etc/init.d/ntpd` należy do pakietu `ntpdate`, a `/etc/init.d/softcam` do
+  `oscam-gos` (oba z feedu Graterlii), więc aktualizacja z feedu może poprawki
+  nadpisać. Tych skryptów nie ma w żadnym publicznym repo (patrz [Źródła](#źródła)).
 
 ## Dysk
 
@@ -130,11 +133,19 @@ pamięć BPA2. Bez `NAND=` to jądro nie widzi NAND (`/proc/mtd` puste).
 ### NAND
 
 [sh4/latki/graterlia_gen_nand.patch](../sh4/latki/graterlia_gen_nand.patch) odtwarza
-obsługę NAND z binarki Graterlii, bo jej źródeł nikt nie opublikował: `gen_nand` na
+obsługę NAND z binarki Graterlii (źródło znalazło się później, patrz niżej): `gen_nand` na
 banku EMI 1, ALE = A16, CLE = A17, nCE = PIO 3.6, R/B = PIO 4.5, ECC programowe
 (OOB 0–3, 6–7), układ ST NAND512 (64 MB, strona 512 B). **Pułapka:** odczyt idzie
 przez `0xA0400000`, a zapis i komendy przez `0xA0800000`, bo A22 to nW, a A23 to nR.
 Bez tego `dmesg` mówi `No NAND device found`.
+
+Oryginał to `stx7100_configure_nand()` z
+`Patches/build-enigma2/linux-sh4-adb5800_setup_stm24_0217.patch` w
+[mickeyreg/cdk](https://github.com/mickeyreg/cdk). Zgadza się z odtworzonym (te same
+nóżki, `chip_delay` 40 µs, `NAND_NO_AUTOINCR`, `IO_ADDR_W = io_base + 0x400000`
+w `plat_nand.c`, BPA2 56 MB @`0x10800000` + 28 MB). Jedyna różnica: trzecie słowo
+konfiguracji banku EMI 2 to w źródle `0x8a230000`, a w łatce `0x8a130000`
+(odczytane z rejestrów działającej Graterlii). Działa jedno i drugie.
 
 Sterownik jest sprawdzony na jednym boxie (BSLA). **Na NAND działa od 2026-10-31,
 więc długiej pracy z zapisem `jffs2` jeszcze nie sprawdzono.** Przed wgraniem zrób
@@ -188,8 +199,11 @@ nie musi wrócić na NAND**, powrót to wybór wpisu strzałkami przy boxie (3 s
   (plazma LG), część trzyma (Sony, LG webOS) —
   [skrypty/nbox_tv](../skrypty/nbox_tv).
 - Fabryczny `cec_ctrl.ko` (`kernel-modules-cec-gos`) tylko nadaje; kod
-  odbioru jest w `#if 0`. Linia CEC to PIO 4.4 (open-drain), a nie 3.7
-  (tam są inne impulsy co 0,8 s). Szczegóły i zamiennik: [README](../README.md).
+  odbioru jest w `#if 0`. Linia CEC to PIO 4.4 (open-drain), a nie 3.7.
+  **PIO 3.7 to HDMI hotplug:** zajmuje ją `stmcore-display-stx7100`
+  (`gpio_request(..., "HDMI Hotplug")` w `stgfb`), stąd `Device or resource busy`
+  przy próbie jej wzięcia i impulsy ~0,8 s przy przełączaniu TV — to ta sama linia
+  co `hdmi0.0/hotplug` wyżej. Szczegóły i zamiennik: [README](../README.md).
 - ST40: TMU0 to clockevent, TMU1 clocksource, **TMU2 wolny**
   (Pphi/4 = 16,594 MHz, irq 18). Zapis TCNT2 przy działającym kanale jest
   ignorowany — najpierw stop kanału w TSTR.
@@ -197,3 +211,20 @@ nie musi wrócić na NAND**, powrót to wybór wpisu strzałkami przy boxie (3 s
   w drzewie jądra (`stm_gpio_direction` nie jest eksportowane — nóżka przez
   `stpio_request_pin(..., STPIO_BIDIR)`). Rejestry: `busybox devmem 0xffd80028 16`;
   Python `mmap` na `/dev/mem` czyta rejestry 16-bitowe jako 0.
+
+## Źródła
+
+Co z obrazu da się znaleźć na GitHubie (stan 2026-11):
+
+| część obrazu | źródło |
+|---|---|
+| enigma2 (`enigma2 - 2016.09.11-22`, w binarce `GOS_2016-09-11 - Branch: master`) | [herpoi/GraterliaOS-OpenPLi](https://github.com/herpoi/GraterliaOS-OpenPLi), gałąź `master`, commit `e1001af` z 2016-09-11; ten sam zestaw modułów `Screens`/`Components`. Fork `mickeyreg/GraterliaOS-OpenPLi` jest starszy (maj 2016) |
+| jądro: plik płyty, lista łatek, config | [mickeyreg/cdk](https://github.com/mickeyreg/cdk): `linux-sh4-adb5800_setup_stm24_0217.patch`, `ADB5800_PATCHES_24` w `make/linux-kernel.mk`, `linux-sh4-2.6.32.61_0217_adb5800.config` (z kwietnia 2016 — bliski configowi z boxa, ale nie identyczny) |
+| moduły (`player2`, `stmdvb`, `fe-core`, `front_bsla`/`front_bska`, `fan_ctrl`, `smartcard`, `cec_ctrl`, `stmfb`) | [mickeyreg/driver](https://github.com/mickeyreg/driver); większość modułów z obrazu ma datę 2016-04-19, jak commity ADB5800 w tym repo |
+| `fp_control`, `evremote2` | [mickeyreg/apps](https://github.com/mickeyreg/apps) |
+| skrypty startowe (`g*` w `/etc/init.d`, `ntpd`, `softcam`, `/etc/sysconfig/gfunctions`) | brak — pakiety `graterlia`, `graterlia-scripts`, `ntpdate`, `oscam-gos` tylko z feedu Graterlii |
+
+Plik płyty z `cdk` różni się od `adb_box_setup` (Duckbox/Audioniek), na którym
+stoi jądro z tego repo, jeszcze w dwóch miejscach, bez wpływu na pracę: bufor RX
+`lirc_stm` alokowany ×4 (limit `RX too many symbols (max 100)` jest ten sam) i
+trasowanie przerwań zewnętrznych ILC w `mach.c` (tylko `IRQ1`).

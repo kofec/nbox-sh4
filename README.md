@@ -40,8 +40,9 @@ pokazuje, a TV nie widzi boxa na liście źródeł.
 
 - **Linia CEC to PIO 4.4** — ta sama nóżka, na której nadaje `cec_ctrl`, w
   trybie open-drain (bidir), więc rejestr wejścia pokazuje faktyczny stan linii.
-  PIO 3.7, które sugeruje kod `cec_adb_box`, to nie CEC (na nim są tylko
-  impulsy ~0,8 s przy przełączaniu TV).
+  PIO 3.7, które sugeruje kod `cec_adb_box`, to nie CEC, tylko HDMI hotplug
+  (zajęte przez `stmcore-display-stx7100`, stąd impulsy ~0,8 s przy przełączaniu
+  TV) — [docs/graterlia.md](docs/graterlia.md#hdmi-i-cec).
 - **Odbiór:** przerwanie GPIO na obu zboczach, czasy z zegara, dekoder bitów
   w [cec_rx_dekoder.h](sh4/cec_rx/cec_rx_dekoder.h) (testowany na PC na
   zboczach nagranych z boxów). Python z `/dev/mem` daje ~2000 próbek/s, a CEC
