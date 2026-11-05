@@ -5,6 +5,7 @@
 #                                          zastepuje cec_ctrl (kernel-modules-cec-gos) i cec_rx
 #   kernel-module-cec-rx                 - sh4/cec_rx (cec_rx.ko + /etc/init.d/cec_rx)
 #   enigma2-plugin-systemplugins-nboxcec - enigma2/NBoxCEC (zawsze)
+#   enigma2-plugin-systemplugins-ncpluslista - enigma2/NcplusLista (zawsze)
 #
 #   python pakiety/zbuduj_ipk.py [--nbox-ko SCIEZKA/nbox_cec.ko] [--ko SCIEZKA/cec_rx.ko] [--wyj KATALOG]
 #
@@ -28,6 +29,10 @@ PAKIETY = os.path.join(REPO, 'pakiety')
 WTYCZKA = os.path.join(REPO, 'enigma2', 'NBoxCEC')
 NBOX_CEC_C = os.path.join(REPO, 'sh4', 'nbox_cec', 'nbox_cec.c')
 CEL_WTYCZKI = 'usr/lib/enigma2/python/Plugins/SystemPlugins/NBoxCEC'
+NCPL = os.path.join(REPO, 'enigma2', 'NcplusLista')
+CEL_NCPL = 'usr/lib/enigma2/python/Plugins/SystemPlugins/NcplusLista'
+PLIKI_NCPL = ('__init__.py', 'si.py', 'lamedb.py', 'budowa.py', 'scalanie.py', 'przebieg.py',
+              'odczyt.py', 'plugin.py')
 VERMAGIC = b'vermagic=2.6.32.61_stm24_0217 preempt mod_unload SH4LE'
 
 
@@ -107,8 +112,8 @@ def ipk(katalog_ctl, dane, wersja, wyj, mtime):
     return sciezka
 
 
-def wersja_wtyczki():
-    m = re.search(r"^WERSJA = '([^']+)'", tekst(os.path.join(WTYCZKA, 'plugin.py')).decode('utf-8'), re.M)
+def wersja_wtyczki(katalog=WTYCZKA):
+    m = re.search(r"^WERSJA = '([^']+)'", tekst(os.path.join(katalog, 'plugin.py')).decode('utf-8'), re.M)
     return m.group(1)
 
 
@@ -149,6 +154,9 @@ def main():
         (CEL_WTYCZKI + '/' + n, tekst(os.path.join(WTYCZKA, n)), 0o644)
         for n in ('__init__.py', 'cec_core.py', 'plugin.py')
     ], wersja_wtyczki(), a.wyj, a.mtime)
+    ipk(os.path.join(PAKIETY, 'enigma2-plugin-systemplugins-ncpluslista'), [
+        (CEL_NCPL + '/' + n, tekst(os.path.join(NCPL, n)), 0o644) for n in PLIKI_NCPL
+    ], wersja_wtyczki(NCPL), a.wyj, a.mtime)
 
 
 if __name__ == '__main__':

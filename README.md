@@ -15,6 +15,7 @@ W środku:
 | [sh4/cec_rx](sh4/cec_rx) | moduł `cec_rx` — sam podsłuch linii CEC (nic nie nadaje) i logger |
 | [sh4/cec_diag](sh4/cec_diag), [sh4/cec_rx_test](sh4/cec_rx_test) | moduły diagnostyczne, którymi szukaliśmy nóżki CEC (rejestry PIO, zbocza) |
 | [enigma2/NBoxCEC](enigma2/NBoxCEC) | wtyczka enigmy **nBox CEC**: stan TV i wybrane wejście, budzenie / usypianie boxa wg TV, włączanie / wyłączanie TV wg boxa, pilot TV |
+| [enigma2/NcplusLista](enigma2/NcplusLista) | wtyczka enigmy **Lista kanałów z satelity**: bukiet „CANAL+ (satelita)” wg numeracji nc+ prosto z BAT na satelicie, uzupełnianie `lamedb`, aktualizacja kanałów przeniesionych przez operatora; narzędzia `skrypty/si_*.py` do odczytu tabel DVB |
 | [pakiety](pakiety) | pliki `control` / skrypty i [zbuduj_ipk.py](pakiety/zbuduj_ipk.py), który składa z tego pakiety `.ipk` dla opkg 0.2.4 |
 | [sh4/collectd](sh4/collectd) | **collectd 5.12.0** na nBoxa (CPU, RAM, dyski, sieć) wysyłający statystyki do routera, np. OpenWrt z `luci-app-statistics` |
 | [sh4/zbuduj_jadro_printk.sh](sh4/zbuduj_jadro_printk.sh) | **jądro z `dmesg`** do startu z pendrive'a lub z NAND, moduły z obrazu działają bez przebudowy; opis w [docs/graterlia.md](docs/graterlia.md#dmesg) |
@@ -229,6 +230,10 @@ Build kit for **nBox ADB 5800** set-top boxes (STi7100, sh4) running
   `/proc/nbox_cec`, `/proc/nbox_cec_klawisze` and `/proc/stb/hdmi/cec`;
 - **nBox CEC**, an enigma2 plugin that wakes / puts the box to standby following
   the TV and switches the TV on / off following the box;
+- **Lista kanałów z satelity** (`enigma2/NcplusLista`), an enigma2 plugin that reads
+  the nc+ channel list (BAT with LCN) from Hot Bird 13°E on a free tuner and keeps
+  a "CANAL+ (satelita)" bouquet and `lamedb` up to date; `skrypty/si_*.py` dump and
+  compare DVB SI tables;
 - **collectd 5.12.0** for the box, sending stats to a router's collectd;
 - `sh4/zbuduj_jadro_printk.sh`: a kernel with `printk` (the stock one has none, so
   `dmesg` is empty) that boots from a USB stick or NAND; stock modules load unchanged,

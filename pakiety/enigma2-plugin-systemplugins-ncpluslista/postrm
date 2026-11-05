@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# pusty katalog po usunieciu (przy aktualizacji zostaja nowe pliki - rmdir nic nie zrobi).
+# /etc/enigma2/ncpluslista.json i bukiet CANAL+ (satelita) zostaja - to dane uzytkownika.
+rmdir /usr/lib/enigma2/python/Plugins/SystemPlugins/NcplusLista 2>/dev/null
+
+exit 0

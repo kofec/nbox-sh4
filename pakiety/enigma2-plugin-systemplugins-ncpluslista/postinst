@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# skompilowane stare wersje - enigma zbuduje nowe przy starcie
+rm -f /usr/lib/enigma2/python/Plugins/SystemPlugins/NcplusLista/*.pyo \
+	/usr/lib/enigma2/python/Plugins/SystemPlugins/NcplusLista/*.pyc
+echo "NcplusLista: zrestartuj enigme (menu albo OpenWebif /web/powerstate?newstate=3)"
+echo "NcplusLista: domyslnie tryb probny - nic nie zmienia w /etc/enigma2, tylko raport"
+
+exit 0

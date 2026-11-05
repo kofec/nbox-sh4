@@ -1,0 +1,9 @@
+Package: enigma2-plugin-systemplugins-ncpluslista
+Version: @WERSJA@
+Description: Lista kanalow z satelity - bouquet CANAL+ (satelita) from nc+ BAT, weekly, trial mode by default
+Section: extra
+Priority: optional
+Maintainer: Kofec <18610805+kofec@users.noreply.github.com>
+Architecture: all
+Depends: enigma2
+Source: https://github.com/kofec/nbox-sh4 enigma2/NcplusLista
