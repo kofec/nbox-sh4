@@ -6,6 +6,8 @@
 #   kernel-module-cec-rx                 - sh4/cec_rx (cec_rx.ko + /etc/init.d/cec_rx)
 #   enigma2-plugin-systemplugins-nboxcec - enigma2/NBoxCEC (zawsze)
 #   enigma2-plugin-systemplugins-ncpluslista - enigma2/NcplusLista (zawsze)
+#   enigma2-plugin-systemplugins-nboxkopia - enigma2/NBoxKopia + skrypty/nbox_kopia.sh
+#                                          jako /usr/bin/nbox_kopia (zawsze)
 #
 #   python pakiety/zbuduj_ipk.py [--nbox-ko SCIEZKA/nbox_cec.ko] [--ko SCIEZKA/cec_rx.ko] [--wyj KATALOG]
 #
@@ -33,6 +35,9 @@ NCPL = os.path.join(REPO, 'enigma2', 'NcplusLista')
 CEL_NCPL = 'usr/lib/enigma2/python/Plugins/SystemPlugins/NcplusLista'
 PLIKI_NCPL = ('__init__.py', 'si.py', 'lamedb.py', 'budowa.py', 'scalanie.py', 'przebieg.py',
               'odczyt.py', 'plugin.py')
+KOPIA = os.path.join(REPO, 'enigma2', 'NBoxKopia')
+CEL_KOPII = 'usr/lib/enigma2/python/Plugins/SystemPlugins/NBoxKopia'
+KOPIA_SH = os.path.join(REPO, 'skrypty', 'nbox_kopia.sh')
 VERMAGIC = b'vermagic=2.6.32.61_stm24_0217 preempt mod_unload SH4LE'
 
 
@@ -157,6 +162,10 @@ def main():
     ipk(os.path.join(PAKIETY, 'enigma2-plugin-systemplugins-ncpluslista'), [
         (CEL_NCPL + '/' + n, tekst(os.path.join(NCPL, n)), 0o644) for n in PLIKI_NCPL
     ], wersja_wtyczki(NCPL), a.wyj, a.mtime)
+    ipk(os.path.join(PAKIETY, 'enigma2-plugin-systemplugins-nboxkopia'), [
+        (CEL_KOPII + '/' + n, tekst(os.path.join(KOPIA, n)), 0o644)
+        for n in ('__init__.py', 'kopie.py', 'plugin.py')
+    ] + [('usr/bin/nbox_kopia', tekst(KOPIA_SH), 0o755)], wersja_wtyczki(KOPIA), a.wyj, a.mtime)
 
 
 if __name__ == '__main__':

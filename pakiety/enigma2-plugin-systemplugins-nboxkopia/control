@@ -1,0 +1,9 @@
+Package: enigma2-plugin-systemplugins-nboxkopia
+Version: @WERSJA@
+Description: nBox kopia - backup of box configuration and moving it to another box (channels, enigma, oscam, network, system, our packages)
+Section: extra
+Priority: optional
+Maintainer: Michal <kofec80@gmail.com>
+Architecture: all
+Depends: enigma2
+Source: https://github.com/kofec/nbox-sh4 enigma2/NBoxKopia, skrypty/nbox_kopia.sh

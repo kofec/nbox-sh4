@@ -16,6 +16,7 @@ W środku:
 | [sh4/cec_diag](sh4/cec_diag), [sh4/cec_rx_test](sh4/cec_rx_test) | moduły diagnostyczne, którymi szukaliśmy nóżki CEC (rejestry PIO, zbocza) |
 | [enigma2/NBoxCEC](enigma2/NBoxCEC) | wtyczka enigmy **nBox CEC**: stan TV i wybrane wejście, budzenie / usypianie boxa wg TV, włączanie / wyłączanie TV wg boxa, pilot TV |
 | [enigma2/NcplusLista](enigma2/NcplusLista) | wtyczka enigmy **Lista kanałów z satelity**: bukiet „CANAL+ (satelita)” wg numeracji nc+ prosto z BAT na satelicie, uzupełnianie `lamedb`, aktualizacja kanałów przeniesionych przez operatora; narzędzia `skrypty/si_*.py` do odczytu tabel DVB |
+| [enigma2/NBoxKopia](enigma2/NBoxKopia), [skrypty/nbox_kopia.sh](skrypty/nbox_kopia.sh) | wtyczka enigmy **nBox kopia**: kopia konfiguracji boxa (kanały, enigma, oscam, sieć, system) na dysk / pendrive / NFS, ręcznie albo automatycznie, i wgranie jej — też na inny box |
 | [pakiety](pakiety) | pliki `control` / skrypty i [zbuduj_ipk.py](pakiety/zbuduj_ipk.py), który składa z tego pakiety `.ipk` dla opkg 0.2.4 |
 | [sh4/collectd](sh4/collectd) | **collectd 5.12.0** na nBoxa (CPU, RAM, dyski, sieć) wysyłający statystyki do routera, np. OpenWrt z `luci-app-statistics` |
 | [sh4/zbuduj_jadro_printk.sh](sh4/zbuduj_jadro_printk.sh) | **jądro z `dmesg`** do startu z pendrive'a lub z NAND, moduły z obrazu działają bez przebudowy; opis w [docs/graterlia.md](docs/graterlia.md#dmesg) |
@@ -105,7 +106,11 @@ cd sh4/cec_rx && gcc -O2 -Wall -o test_dekoder test_dekoder.c && ./test_dekoder
 cd sh4/nbox_cec && gcc -O2 -Wall -I../cec_rx -o test_protokol test_protokol.c && ./test_protokol
 python3 enigma2/test_cec_core.py
 python3 enigma2/test_plugin_atrapy.py
+python3 enigma2/test_nboxkopia.py       # z sh w PATH (np. Git Bash) także test skryptu
 ```
+
+Same wtyczki (bez modułów) nie potrzebują Dockera: `python3 pakiety/zbuduj_ipk.py --wyj wynik`
+daje pakiety nBox CEC, Listy kanałów z satelity i nBox kopia.
 
 Tym samym kontenerem da się budować zwykłe programy: `sh4-linux-gcc t.c` daje
 ELF z `/lib/ld-linux.so.2` i symbolami glibc najwyżej `GLIBC_2.12`.
@@ -138,6 +143,37 @@ profil TV (jak rozpoznać, że TV działa), reakcje boxa na TV (obudź, gdy TV
 wybierze wejście nBoxa / uśpij po N s od wyłączenia TV lub przełączenia na
 inne wejście) i TV na box (włącz i przełącz wejście przy budzeniu, wyłącz przy
 usypianiu), pilot TV. Log: `/tmp/nboxcec.log`.
+
+## nBox kopia
+
+Wtyczka **Menu → Ustawienia → System → nBox kopia** i skrypt `/usr/bin/nbox_kopia`,
+który robi całą robotę (działa też z SSH). Kopia to katalog
+`<miejsce>/nbox_kopia/<oktet>_<data>[_opis]/` z osobnymi archiwami części:
+
+| część | zawartość |
+|---|---|
+| kanały | `lamedb`, `lamedb5`, bukiety, alternatywy, blacklist / whitelist |
+| enigma | reszta `/etc/enigma2` (settings, timery…), picony, tuxtxt, videomode |
+| oscam | `/etc/oscam`, `/usr/bin/oscam`, `/etc/init.d/softcam` |
+| sieć | `interfaces`, `resolv.conf`, `hosts`, `fstab`, `exports`, `wpa_supplicant` |
+| system | `rc.local`, `/root`, usługi z `rc.d`, crontab, `passwd` / `group`, klucze dropbeara, strefa czasu |
+| pakiety | lista zainstalowanych pakietów |
+
+Pomijane: `*.bak*`, `*.ipk`, `*.pyc`, `epg.dat`, logi crashy, pliki w `/root`
+ponad 512 KB. Kanały i oscam wgrywają się bez restartu; inne części zamykają
+enigmę, podmieniają pliki i kończą restartem albo wyłączeniem boxa. Przed
+każdym wgraniem skrypt robi kopię obecnego stanu (`…_przed_wgraniem`, 3
+ostatnie). Kopia automatyczna (codziennie / co tydzień) jest domyślnie
+wyłączona. Na drugi box w tej samej sieci nie wgrywać części *sieć* (adres) ani
+*system* (klucze SSH).
+
+```sh
+nbox_kopia sprawdz                          # co weszłoby do kopii, nic nie zapisuje
+nbox_kopia zapisz -d /hdd                   # kopia; -o OPIS, -z N = zostaw N ostatnich
+nbox_kopia wgraj KATALOG_KOPII kanaly,oscam nic   # części po przecinku albo "wszystko"; po: restart | wylacz | nic
+```
+
+Przebieg wgrywania: `/tmp/nbox_kopia.log`.
 
 ## Zachowanie telewizorów
 
@@ -204,7 +240,7 @@ bez niego plik zostaje pusty.
 - collectd: [collectd/collectd](https://github.com/collectd/collectd), łatki z
   [openwrt/packages](https://github.com/openwrt/packages/tree/openwrt-19.07/utils/collectd/patches).
 
-Moduły `nbox_cec`, `cec_rx`, wtyczka i skrypty są napisane od nowa; komentarze
+Moduły `nbox_cec`, `cec_rx`, wtyczki i skrypty są napisane od nowa; komentarze
 w kodzie są po polsku.
 
 ## Licencja
@@ -234,6 +270,9 @@ Build kit for **nBox ADB 5800** set-top boxes (STi7100, sh4) running
   the nc+ channel list (BAT with LCN) from Hot Bird 13°E on a free tuner and keeps
   a "CANAL+ (satelita)" bouquet and `lamedb` up to date; `skrypty/si_*.py` dump and
   compare DVB SI tables;
+- **nBox kopia** (`enigma2/NBoxKopia`, `skrypty/nbox_kopia.sh`), an enigma2 plugin and
+  shell script that back up the box configuration (channels, enigma settings, oscam,
+  network, system) to disk / USB / NFS and restore it, also onto another box;
 - **collectd 5.12.0** for the box, sending stats to a router's collectd;
 - `sh4/zbuduj_jadro_printk.sh`: a kernel with `printk` (the stock one has none, so
   `dmesg` is empty) that boots from a USB stick or NAND; stock modules load unchanged,

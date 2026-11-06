@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# skompilowane stare wersje - enigma zbuduje nowe przy starcie
+rm -f /usr/lib/enigma2/python/Plugins/SystemPlugins/NBoxKopia/*.pyo \
+	/usr/lib/enigma2/python/Plugins/SystemPlugins/NBoxKopia/*.pyc
+echo "nBox kopia: zrestartuj enigme (menu albo OpenWebif /web/powerstate?newstate=3)"
+echo "nBox kopia: kopia automatyczna domyslnie wylaczona; z SSH: nbox_kopia sprawdz"
+
+exit 0
