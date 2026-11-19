@@ -16,7 +16,7 @@ W środku:
 | [sh4/cec_diag](sh4/cec_diag), [sh4/cec_rx_test](sh4/cec_rx_test) | moduły diagnostyczne, którymi szukaliśmy nóżki CEC (rejestry PIO, zbocza) |
 | [enigma2/NBoxCEC](enigma2/NBoxCEC) | wtyczka enigmy **nBox CEC**: stan TV i wybrane wejście, budzenie / usypianie boxa wg TV, włączanie / wyłączanie TV wg boxa, pilot TV |
 | [enigma2/NcplusLista](enigma2/NcplusLista) | wtyczka enigmy **Lista kanałów z satelity**: bukiet „CANAL+ (satelita)” wg numeracji nc+ prosto z BAT na satelicie, uzupełnianie `lamedb`, aktualizacja kanałów przeniesionych przez operatora; narzędzia `skrypty/si_*.py` do odczytu tabel DVB |
-| [enigma2/NBoxKopia](enigma2/NBoxKopia), [skrypty/nbox_kopia.sh](skrypty/nbox_kopia.sh) | wtyczka enigmy **nBox kopia**: kopia konfiguracji boxa (kanały, enigma, oscam, sieć, system) na dysk / pendrive / NFS, ręcznie albo automatycznie, i wgranie jej — też na inny box |
+| [enigma2/NBoxKopia](enigma2/NBoxKopia), [skrypty/nbox_kopia.sh](skrypty/nbox_kopia.sh) | wtyczka enigmy **nBox kopia**: kopia konfiguracji boxa (kanały, enigma, oscam, sieć, system) na dysk / pendrive / NFS, ręcznie albo automatycznie, i wgranie jej — też na inny box; numer egzemplarza i historia napraw (`/root/nbox_HW_<numer>.txt`), menu startowe u-boota |
 | [pakiety](pakiety) | pliki `control` / skrypty i [zbuduj_ipk.py](pakiety/zbuduj_ipk.py), który składa z tego pakiety `.ipk` dla opkg 0.2.4 |
 | [sh4/collectd](sh4/collectd) | **collectd 5.12.0** na nBoxa (CPU, RAM, dyski, sieć) wysyłający statystyki do routera, np. OpenWrt z `luci-app-statistics` |
 | [sh4/zbuduj_jadro_printk.sh](sh4/zbuduj_jadro_printk.sh) | **jądro z `dmesg`** do startu z pendrive'a lub z NAND, moduły z obrazu działają bez przebudowy; opis w [docs/graterlia.md](docs/graterlia.md#dmesg) |
@@ -172,9 +172,39 @@ wyłączona. Na drugi box w tej samej sieci nie wgrywać części *sieć* (adres
 nbox_kopia sprawdz                          # co weszłoby do kopii, nic nie zapisuje
 nbox_kopia zapisz -d /hdd                   # kopia; -o OPIS, -z N = zostaw N ostatnich
 nbox_kopia wgraj KATALOG_KOPII kanaly,oscam nic   # części po przecinku albo "wszystko"; po: restart | wylacz | nic
+nbox_kopia sprzet                           # numer egzemplarza i plik HW
+nbox_kopia sprzet dodaj "wymiana C270, C271 (Low ESR)"   # wpis z dzisiejszą datą
 ```
 
 Przebieg wgrywania: `/tmp/nbox_kopia.log`.
+
+### Sprzęt: numer egzemplarza i historia napraw (od 1.1)
+
+Każdy box ma unikalny **numer kości NOR** (fabryczny rejestr ochronny, patrz
+[docs/graterlia.md](docs/graterlia.md#nor-u-boot-jego-środowisko-i-numer-kości)) —
+czyta go `nor_otp` z pakietu `nbox-nor-otp`, na jądrze z
+[sh4/latki/nbox_nor_ro.patch](sh4/latki/nbox_nor_ro.patch). Bez tego jądra numeru nie
+ma, a ekran „Sprzęt” to mówi; MAC-a nie używamy, bo się powtarza.
+
+- Historia sprzętu (wymiany kondensatorów, zasilacza, dysku…) to krótki plik
+  `/root/nbox_HW_<numer>.txt`, wpisy `RRRR-MM-DD tekst`. W wtyczce: **Sprzęt: numer
+  boxa i historia napraw**, zielony = dopisz wpis (klawiatura ekranowa, data sama).
+  Dłuższe zmiany przez SSH.
+- Kopia ma `box_id=` w `info.txt` i plik HW na wierzchu katalogu kopii (do czytania
+  bez rozpakowywania; jest też w `system.tgz`).
+- Plik HW należy do sprzętu, nie do konfiguracji: wgranie części *system* go nie
+  nadpisuje ani nie kasuje. Z kopii tego samego egzemplarza wraca tylko wtedy, gdy
+  na boxie go nie ma (np. po flashowaniu NAND); pliki innych egzemplarzy zostają w
+  kopii, a wtyczka i skrypt ostrzegają, że kopia jest z innego boxa.
+- **Menu startowe u-boota**: pozycje menu ze środowiska u-boota w NOR (tylko odczyt;
+  aktywne środowisko = to, którego `bootargs` są w `/proc/cmdline`), z oznaczeniem
+  domyślnej pozycji i tych, które kasują część NOR-a.
+
+```sh
+docker run --rm -u $(id -u):$(id -g) -v "$PWD":/work -w /work/sh4/nor_otp nbox-sh4:4.8.4 \
+    sh4-linux-gcc -O2 -Wall -o nor_otp nor_otp.c
+python3 pakiety/zbuduj_ipk.py --nor-otp sh4/nor_otp/nor_otp --wyj wynik
+```
 
 ## Zachowanie telewizorów
 
@@ -271,7 +301,9 @@ Build kit for **nBox ADB 5800** set-top boxes (STi7100, sh4) running
   the nc+ channel list (BAT with LCN) from Hot Bird 13°E on a free tuner and keeps
   a "CANAL+ (satelita)" bouquet and `lamedb` up to date; `skrypty/si_*.py` dump and
   compare DVB SI tables;
-- **nBox kopia** (`enigma2/NBoxKopia`, `skrypty/nbox_kopia.sh`), an enigma2 plugin and
+- **nBox kopia** (`enigma2/NBoxKopia`, `skrypty/nbox_kopia.sh`; since 1.1 also a
+  per-unit hardware log `/root/nbox_HW_<NOR id>.txt` that restores never overwrite,
+  and a read-only view of the u-boot boot menu from NOR), an enigma2 plugin and
   shell script that back up the box configuration (channels, enigma settings, oscam,
   network, system) to disk / USB / NFS and restore it, also onto another box;
 - **collectd 5.12.0** for the box, sending stats to a router's collectd;

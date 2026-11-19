@@ -8,6 +8,9 @@
 #   - Wgraj kopie           - wybor kopii ze wszystkich dyskow/NFS, czesci
 #                             do wgrania, potem restart / wylaczenie boxa,
 #   - Co wejdzie do kopii   - nbox_kopia sprawdz,
+#   - Sprzet                - numer egzemplarza (kosc NOR) i historia napraw
+#                             z /root/nbox_HW_<id>.txt, zielony = dopisz wpis,
+#   - Menu startowe u-boota - pozycje menu ze srodowiska w NOR (tylko odczyt),
 #   - Ustawienia            - miejsce, kopia automatyczna (dzien/tydzien, godzina,
 #                             ile zostawic).
 # Cala robote na plikach robi /usr/bin/nbox_kopia (skrypty/nbox_kopia.sh);
@@ -33,9 +36,11 @@ from Screens.Screen import Screen
 from Screens.MessageBox import MessageBox
 from Screens.ChoiceBox import ChoiceBox
 from Screens.Console import Console
+from Screens.VirtualKeyBoard import VirtualKeyBoard
 from Components.ActionMap import ActionMap
 from Components.ConfigList import ConfigListScreen
 from Components.MenuList import MenuList
+from Components.ScrollLabel import ScrollLabel
 from Components.Sources.StaticText import StaticText
 from Components.config import config, ConfigSubsection, ConfigYesNo, \
     ConfigSelection, ConfigText, ConfigInteger, getConfigListEntry, configfile
@@ -43,8 +48,13 @@ from Tools import Notifications
 
 from Plugins.SystemPlugins.NBoxKopia import kopie
 
-WERSJA = '1.0'
+WERSJA = '1.1'
 SKRYPT = '/usr/bin/nbox_kopia'
+PROC_MTD = '/proc/mtd'
+PROC_CMDLINE = '/proc/cmdline'
+DEV_KAT = '/dev/'
+NOR_NAZWA = '"nor"'                         # partycja z latki nbox_nor_ro.patch
+NOR_CZYTAJ = 0x200000                       # zworka A20: druga polowa to lustro
 LOG = '/tmp/nbox_kopia_wtyczka.log'
 LOG_TLA = '/tmp/nbox_kopia.log'
 LOG_MAX = 64 * 1024
@@ -85,6 +95,49 @@ def miejsca():
     if ust.miejsce.value not in [m[0] for m in wynik] and os.path.isdir(ust.miejsce.value):
         wynik.insert(0, (ust.miejsce.value, 0, '?'))
     return wynik
+
+
+def sprzet():
+    """dict z kopie.parsuj_sprzet (nbox_kopia sprzet)."""
+    try:
+        p = os.popen('%s sprzet 2>/dev/null' % SKRYPT)
+        wynik = kopie.parsuj_sprzet(p.read())
+        p.close()
+        return wynik
+    except Exception:
+        log('sprzet: %s' % traceback.format_exc())
+        return kopie.parsuj_sprzet('')
+
+
+def urzadzenie_nor():
+    """/dev/mtdN partycji "nor" z /proc/mtd albo None (jadro bez NOR)."""
+    try:
+        with open(PROC_MTD) as f:
+            for l in f:
+                c = l.split()
+                if len(c) == 4 and c[3] == NOR_NAZWA:
+                    return DEV_KAT + c[0].rstrip(':')
+    except (IOError, OSError):
+        pass
+    return None
+
+
+def tekst_menu_uboot():
+    dev = urzadzenie_nor()
+    if dev is None:
+        return ('Jądro nie widzi pamięci NOR z u-bootem (w /proc/mtd brak partycji "nor").\n'
+                'Potrzebne jądro z łatką nbox_nor_ro.patch (NOR tylko do odczytu).')
+    with open(dev, 'rb') as f:
+        dane = f.read(NOR_CZYTAJ)
+    try:
+        with open(PROC_CMDLINE) as f:
+            cmdline = f.read()
+    except (IOError, OSError):
+        cmdline = ''
+    s = kopie.aktywne(kopie.srodowiska(dane), cmdline)
+    if s is None:
+        return 'W %s nie znalazłem środowiska u-boota z poprawnym CRC.' % dev
+    return kopie.opis_menu(s[0], s[2])
 
 
 def zapisz_settings():
@@ -190,6 +243,8 @@ class NBoxKopiaMenu(Screen):
             ('Zrób kopię teraz', self.zrob),
             ('Wgraj kopię (też z innego boxa)', self.wybierz_kopie),
             ('Co wejdzie do kopii', self.sprawdz),
+            ('Sprzęt: numer boxa i historia napraw', self.sprzet),
+            ('Menu startowe u-boota', self.uboot),
             ('Ustawienia: miejsce, kopia automatyczna', self.ustawienia),
         ])
         self['status'] = StaticText('')
@@ -227,6 +282,17 @@ class NBoxKopiaMenu(Screen):
         self.session.open(Console, title='nBox kopia: co wejdzie do kopii',
                           cmdlist=['%s sprawdz' % SKRYPT])
 
+    def sprzet(self):
+        self.session.open(NBoxKopiaSprzet)
+
+    def uboot(self):
+        try:
+            t = tekst_menu_uboot()
+        except Exception:
+            log('uboot: %s' % traceback.format_exc())
+            t = 'Błąd odczytu NOR - szczegóły w %s' % LOG
+        self.session.open(NBoxKopiaTekst, 'Menu startowe u-boota', t)
+
     def ustawienia(self):
         self.session.openWithCallback(lambda *a: self.odswiez(), NBoxKopiaUstawienia)
 
@@ -242,6 +308,64 @@ class NBoxKopiaMenu(Screen):
     def wybrana(self, wybor):
         if wybor:
             self.session.open(NBoxKopiaWgraj, wybor[1])
+
+
+class NBoxKopiaTekst(Screen):
+    skin = """
+    <screen position="center,center" size="1000,560" title="nBox kopia">
+        <widget name="tekst" position="10,10" size="980,500" font="Regular;20" />
+        <widget source="key_green" render="Label" position="10,520" size="400,30" font="Regular;20" foregroundColor="#40ff40" />
+    </screen>"""
+
+    def __init__(self, session, tytul, tekst=''):
+        Screen.__init__(self, session)
+        self['tekst'] = ScrollLabel(tekst)
+        self['key_green'] = StaticText('')
+        self['actions'] = ActionMap(['OkCancelActions', 'DirectionActions', 'ColorActions'], {
+            'ok': self.close, 'cancel': self.close, 'green': self.zielony,
+            'up': self['tekst'].pageUp, 'down': self['tekst'].pageDown,
+            'left': self['tekst'].pageUp, 'right': self['tekst'].pageDown}, -1)
+        self.setTitle(tytul)
+
+    def zielony(self):
+        pass
+
+
+class NBoxKopiaSprzet(NBoxKopiaTekst):
+    """Numer egzemplarza i plik HW; zielony dopisuje wpis z dzisiejsza data."""
+
+    def __init__(self, session):
+        NBoxKopiaTekst.__init__(self, session, 'nBox kopia - sprzęt')
+        self.dane = None
+        self.onShown.append(self.odswiez)
+
+    def odswiez(self):
+        try:
+            self.dane = sprzet()
+            self['tekst'].setText(kopie.opis_sprzetu(self.dane))
+            self['key_green'].text = self.dane['box_id'] and 'Dodaj wpis' or ''
+        except Exception:
+            log('sprzet odswiez: %s' % traceback.format_exc())
+
+    def zielony(self):
+        if not self.dane or not self.dane['box_id']:
+            return
+        self.session.openWithCallback(self.wpis, VirtualKeyBoard,
+                                      title='Wpis do historii (data dopisze się sama)', text='')
+
+    def wpis(self, tekst=None):
+        try:
+            if not tekst or not tekst.strip():
+                return
+            p = os.popen('%s sprzet dodaj %s 2>&1' % (SKRYPT, kopie.cytuj(tekst.strip())))
+            wyj = p.read()
+            rc = p.close()
+            log('sprzet dodaj rc=%s %s' % (rc, wyj.strip()))
+            if rc:
+                self.session.open(MessageBox, 'Nie dopisałem:\n%s' % wyj.strip(), MessageBox.TYPE_ERROR)
+            self.odswiez()
+        except Exception:
+            log('sprzet wpis: %s' % traceback.format_exc())
 
 
 class NBoxKopiaUstawienia(Screen, ConfigListScreen):
@@ -316,6 +440,7 @@ class NBoxKopiaWgraj(Screen, ConfigListScreen):
     def __init__(self, session, kopia):
         Screen.__init__(self, session)
         self.kopia = kopia
+        self.box_id = None
         self['key_red'] = StaticText('Anuluj')
         self['key_green'] = StaticText('Wgraj')
         self['status'] = StaticText('')
@@ -353,6 +478,10 @@ class NBoxKopiaWgraj(Screen, ConfigListScreen):
                                                  k.get('host', ''), k['kat'])]
             if k.get('boxtype') != self.boxtype():
                 t.append('UWAGA: ten box to %s - tunery w ustawieniach enigmy mogą nie pasować.' % self.boxtype())
+            if self.box_id is None:
+                self.box_id = sprzet()['box_id']
+            if k.get('box_id') and self.box_id and k['box_id'] != self.box_id:
+                t.append('Kopia z innego egzemplarza (%s) - jego plik HW zostaje w kopii.' % k['box_id'])
             w = self.wybrane()
             if self.po.value == 'nic' and kopie.wymaga_restartu(w):
                 t.append('Bez restartu tylko kanały i oscam - wybierz restart albo wyłączenie.')

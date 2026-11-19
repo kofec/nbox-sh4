@@ -8,8 +8,11 @@
 #   enigma2-plugin-systemplugins-ncpluslista - enigma2/NcplusLista (zawsze)
 #   enigma2-plugin-systemplugins-nboxkopia - enigma2/NBoxKopia + skrypty/nbox_kopia.sh
 #                                          jako /usr/bin/nbox_kopia (zawsze)
+#   nbox-nor-otp                         - sh4/nor_otp (/usr/bin/nor_otp, id egzemplarza
+#                                          z kosci NOR; jadro z latki nbox_nor_ro.patch)
 #
-#   python pakiety/zbuduj_ipk.py [--nbox-ko SCIEZKA/nbox_cec.ko] [--ko SCIEZKA/cec_rx.ko] [--wyj KATALOG]
+#   python pakiety/zbuduj_ipk.py [--nbox-ko SCIEZKA/nbox_cec.ko] [--ko SCIEZKA/cec_rx.ko]
+#                                [--nor-otp SCIEZKA/nor_otp] [--wyj KATALOG]
 #
 # Moduly .ko nie sa w repo: buduje je kontener z sh4/Dockerfile
 # (README.md); sprawdzany vermagic jadra nBoxow.
@@ -39,6 +42,16 @@ KOPIA = os.path.join(REPO, 'enigma2', 'NBoxKopia')
 CEL_KOPII = 'usr/lib/enigma2/python/Plugins/SystemPlugins/NBoxKopia'
 KOPIA_SH = os.path.join(REPO, 'skrypty', 'nbox_kopia.sh')
 VERMAGIC = b'vermagic=2.6.32.61_stm24_0217 preempt mod_unload SH4LE'
+WERSJA_NOR_OTP = '1.0'
+ELF_SH = 42                     # e_machine EM_SH
+
+
+def binarka_sh4(sciezka):
+    with open(sciezka, 'rb') as f:
+        b = f.read()
+    if b[:4] != b'\x7fELF' or b[4:6] != b'\x01\x01' or b[18] != ELF_SH:
+        sys.exit('%s: to nie ELF sh4 (32-bit, little endian) - zbuduj w kontenerze sh4/Dockerfile' % sciezka)
+    return b
 
 
 def tekst(sciezka):
@@ -139,6 +152,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--nbox-ko', help='zbudowany nbox_cec.ko (sh4)')
     ap.add_argument('--ko', help='zbudowany cec_rx.ko (sh4)')
+    ap.add_argument('--nor-otp', help='zbudowany nor_otp (sh4)')
     ap.add_argument('--wyj', default=os.path.join(os.path.expanduser('~'), 'nbox_pakiety'))
     ap.add_argument('--mtime', type=int, default=int(time.time()))
     a = ap.parse_args()
@@ -155,6 +169,10 @@ def main():
             ('lib/modules/cec_rx.ko', modul(a.ko), 0o644),
             ('etc/init.d/cec_rx', tekst(os.path.join(PAKIETY, 'kernel-module-cec-rx', 'cec_rx.init')), 0o755),
         ], '1.1', a.wyj, a.mtime)
+    if a.nor_otp:
+        ipk(os.path.join(PAKIETY, 'nbox-nor-otp'), [
+            ('usr/bin/nor_otp', binarka_sh4(a.nor_otp), 0o755),
+        ], WERSJA_NOR_OTP, a.wyj, a.mtime)
     ipk(os.path.join(PAKIETY, 'enigma2-plugin-systemplugins-nboxcec'), [
         (CEL_WTYCZKI + '/' + n, tekst(os.path.join(WTYCZKA, n)), 0o644)
         for n in ('__init__.py', 'cec_core.py', 'plugin.py')

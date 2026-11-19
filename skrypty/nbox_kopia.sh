@@ -16,8 +16,18 @@
 #   pakiety.txt lista pakietow; ipk/ = nasze pakiety (Maintainer kofec80)
 #               odtworzone z zainstalowanych plikow
 #   *.txt (lista plikow czesci), info.txt, md5sums
+#   nbox_HW_<id>.txt  historia sprzetu tego egzemplarza (kopia /root/nbox_HW_<id>.txt
+#               na wierzchu, do czytania bez rozpakowywania; jest tez w system.tgz)
 # Pomijane: *.bak*, *.ipk, *.pyc, epg.dat, logi crashy, historia powloki,
 # cache, pliki w /root ponad 512 KB (stare binarki oscama) - lista w info.txt.
+#
+# Id egzemplarza (box_id) to fabryczny numer kosci NOR z nor_otp (pakiet
+# nbox-nor-otp, jadro z NOR tylko do odczytu); bez niego box_id puste. MAC-i nie
+# uzywamy - pochodza z szablonow srodowiska u-boota i sie powtarzaja.
+# Plik /root/nbox_HW_<id>.txt (np. wymiany kondensatorow) nalezy do sprzetu:
+# wgranie kopii nigdy go nie nadpisuje ani nie kasuje; z kopii tego samego
+# egzemplarza wraca tylko, gdy na boxie go nie ma (np. po flashowaniu), a pliki
+# innych egzemplarzy zostaja w kopii.
 #
 # Uzycie:
 #   nbox_kopia sprawdz
@@ -39,16 +49,22 @@
 #       (zostaja 3 ostatnie).
 #   nbox_kopia brakujace KOPIA
 #       pakiety z kopii, ktorych nie ma na tym boxie (do opkg install z feedu)
+#   nbox_kopia sprzet
+#       "box_id=", "boxtype=", "plik=" i po linii "---" tresc pliku HW
+#   nbox_kopia sprzet dodaj TEKST
+#       dopisuje "RRRR-MM-DD TEKST" do /root/nbox_HW_<id>.txt (zaklada plik)
 #   nbox_kopia --w-tle POLECENIE ...
 #       odlaczone od enigmy (setsid), wyjscie w /tmp/nbox_kopia.log - tak
 #       wtyczka wola wgraj, ktore zamyka enigme.
 #
 # NBK_ROOT=katalog: testy na PC (pliki boxa pod tym katalogiem, uslugi,
-# opkg i reboot tylko wypisywane).
+# opkg i reboot tylko wypisywane). NBK_BOX_ID: id zamiast odczytu z nor_otp.
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
 
-WERSJA=1.0
+WERSJA=1.1
+NOR_OTP=/usr/bin/nor_otp
+HW_PREF=nbox_HW_
 R=${NBK_ROOT:-}
 PODKAT=nbox_kopia
 LOG=/tmp/nbox_kopia.log
@@ -106,6 +122,65 @@ oktet() {
 }
 
 boxtype() { sed -n 's/^boxtype=//p' "$R/var/grun/grcstype" 2> /dev/null; }
+
+# fabryczny numer kosci NOR (hex) albo pusto
+box_id() {
+	if [ -n "${NBK_BOX_ID+x}" ]; then
+		echo "$NBK_BOX_ID"
+		return
+	fi
+	[ -x "$NOR_OTP" ] || return 0
+	"$NOR_OTP" 2> /dev/null | sed -n 's/^fabryczny: \([0-9a-f]\{8,\}\)$/\1/p' | head -n 1
+}
+
+# sciezka pliku HW wzgledem korzenia, $1 = id
+plik_hw() { echo "root/$HW_PREF$1.txt"; }
+
+sprzet() {
+	id=$(box_id)
+	echo "box_id=$id"
+	echo "boxtype=$(boxtype)"
+	if [ -n "$id" ]; then
+		echo "plik=/$(plik_hw "$id")"
+	else
+		echo "plik="
+	fi
+	echo "---"
+	[ -n "$id" ] && [ -f "$R/$(plik_hw "$id")" ] && cat "$R/$(plik_hw "$id")"
+	return 0
+}
+
+sprzet_dodaj() {
+	id=$(box_id)
+	[ -n "$id" ] || blad "brak id boxa (nor_otp i jadro z NOR tylko do odczytu)"
+	tekst=$(echo "$*" | tr -d '\r\n')
+	[ -n "$tekst" ] || blad "pusty wpis"
+	[ "$(date +%Y)" -ge 2020 ] || blad "zegar boxa nieustawiony ($(date +%Y)) - wpis mialby zla date"
+	p=$R/$(plik_hw "$id")
+	mkdir -p "${p%/*}"
+	if [ ! -f "$p" ]; then
+		echo "# nBox $(boxtype), id kosci NOR $id" > "$p" || blad "nie moge zapisac $p"
+	fi
+	echo "$(date +%Y-%m-%d) $tekst" >> "$p" || blad "nie moge zapisac $p"
+	echo "dopisane do /$(plik_hw "$id")"
+}
+
+# po rozpakowaniu system.tgz: pliki HW jak przed wgraniem; plik tego
+# egzemplarza z kopii tylko gdy go nie bylo. $1 = katalog z plikami sprzed, $2 = id
+pliki_hw_po_wgraniu() {
+	for f in "$R"/root/$HW_PREF*.txt; do
+		[ -f "$f" ] || continue
+		n=${f##*/}
+		if [ -f "$1/$n" ]; then
+			cp -p "$1/$n" "$f"
+		elif [ -n "$2" ] && [ "$n" = "$HW_PREF$2.txt" ]; then
+			echo "  plik HW tego boxa wrocil z kopii: /root/$n"
+		else
+			rm -f "$f"
+			echo "  plik HW innego egzemplarza zostaje w kopii: $n"
+		fi
+	done
+}
 
 wolne_kb() { df -k "$1" 2> /dev/null | awk 'NR > 1 { w = $(NF - 2) } END { print w + 0 }'; }
 
@@ -262,6 +337,11 @@ zapisz() {
 		done
 	fi
 	zapisane="$zapisane pakiety"
+	id=$(box_id)
+	if [ -n "$id" ] && [ -f "$R/$(plik_hw "$id")" ]; then
+		cp -p "$R/$(plik_hw "$id")" "$kat/" || porzuc "kopia pliku HW"
+		echo "  plik HW: $HW_PREF$id.txt"
+	fi
 	{
 		echo "wersja=$WERSJA"
 		echo "data=$(date '+%Y-%m-%d %H:%M:%S')"
@@ -270,12 +350,14 @@ zapisz() {
 		echo "oktet=$ok"
 		echo "mac=$(cat "$R/sys/class/net/eth0/address" 2> /dev/null)"
 		echo "boxtype=$(boxtype)"
+		echo "box_id=$id"
 		echo "jadro=$(uname -v)"
 		echo "czesci=${zapisane# }"
 		echo "nasze_pakiety=$(echo $nasze)"
 		echo "pominiete=$(sort -u "$T/pominiete" | tr '\n' ' ')"
 	} > "$kat/info.txt"
-	(cd "$kat" && md5sum *.tgz pakiety.txt info.txt $( [ -d ipk ] && ls ipk/*.ipk) > md5sums) ||
+	(cd "$kat" && md5sum *.tgz pakiety.txt info.txt $(ls $HW_PREF*.txt 2> /dev/null) \
+		$( [ -d ipk ] && ls ipk/*.ipk) > md5sums) ||
 		porzuc "md5sums"
 	sync
 	echo "  razem $(du -sk "$kat" | cut -f1) KB"
@@ -303,6 +385,14 @@ miejsca() {
 sprawdz() {
 	zablokuj
 	echo "box: $(boxtype), oktet $(oktet), MAC $(cat "$R/sys/class/net/eth0/address" 2> /dev/null), nbox_kopia $WERSJA"
+	id=$(box_id)
+	if [ -z "$id" ]; then
+		echo "  id boxa: brak (nor_otp i jadro z NOR tylko do odczytu)"
+	elif [ -f "$R/$(plik_hw "$id")" ]; then
+		echo "  id boxa: $id, plik HW /$(plik_hw "$id") ($(wc -l < "$R/$(plik_hw "$id")") linii)"
+	else
+		echo "  id boxa: $id, pliku HW jeszcze nie ma"
+	fi
 	przygotuj_listy
 	for c in $CZESCI; do
 		[ "$c" = pakiety ] && continue
@@ -382,6 +472,10 @@ wgraj() {
 	[ $zatrzymac = 1 ] && [ "$po" = nic ] && blad "czesci$wybrane wymagaja restartu boxa (PO: restart albo wylacz)"
 	z=$(sed -n 's/^boxtype=//p' "$kat/info.txt")
 	[ "$z" != "$(boxtype)" ] && uwaga "kopia z boxa $z, ten box to $(boxtype) - tunery w settings moga nie pasowac"
+	id=$(box_id)
+	zid=$(sed -n 's/^box_id=//p' "$kat/info.txt")
+	[ -n "$zid" ] && [ -n "$id" ] && [ "$zid" != "$id" ] &&
+		uwaga "kopia z innego egzemplarza (id $zid, ten box $id) - plik HW zostaje w kopii"
 	echo "=== wgrywam$wybrane z $kat"
 
 	baza=${kat%/*}
@@ -413,10 +507,15 @@ wgraj() {
 		system)
 			# uslugi wlaczone tak jak w kopii
 			for u in $USLUGI; do rm -f "$R"/etc/rc.d/rc?.d/*"$u"; done
+			mkdir -p "$T/hw"
+			for f in "$R"/root/$HW_PREF*.txt; do
+				[ -f "$f" ] && cp -p "$f" "$T/hw/"
+			done
 			;;
 		esac
 		echo "=== $c"
 		tar xzf "$kat/$c.tgz" -C "$R/" || blad "rozpakowanie $c.tgz (kopia sprzed: $przed)"
+		[ "$c" = system ] && pliki_hw_po_wgraniu "$T/hw" "$id"
 		if [ "$c" = siec ] && [ -f "$R/etc/fstab" ]; then
 			# bez punktow montowania NFS mount z rc.local wisi
 			for m in $(awk '$3 == "nfs" { print $2 }' "$R/etc/fstab"); do
@@ -499,6 +598,16 @@ brakujace)
 	[ -n "$2" ] || blad "brakujace KOPIA"
 	zablokuj
 	brakujace "${2%/}"
+	;;
+sprzet)
+	if [ "$2" = dodaj ]; then
+		shift 2
+		sprzet_dodaj "$*"
+	elif [ $# -eq 1 ]; then
+		sprzet
+	else
+		blad "sprzet [dodaj TEKST]"
+	fi
 	;;
 *)
 	sed -n '/^# Uzycie:/,/^# NBK_ROOT/p' "$0" | sed 's/^# \{0,1\}//'
