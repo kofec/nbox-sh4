@@ -48,7 +48,7 @@ from Tools import Notifications
 
 from Plugins.SystemPlugins.NBoxKopia import kopie
 
-WERSJA = '1.1'
+WERSJA = '1.2'
 SKRYPT = '/usr/bin/nbox_kopia'
 PROC_MTD = '/proc/mtd'
 PROC_CMDLINE = '/proc/cmdline'
@@ -134,10 +134,11 @@ def tekst_menu_uboot():
             cmdline = f.read()
     except (IOError, OSError):
         cmdline = ''
-    s = kopie.aktywne(kopie.srodowiska(dane), cmdline)
+    lista = kopie.srodowiska(dane)
+    s = kopie.aktywne(lista, cmdline)
     if s is None:
         return 'W %s nie znalazłem środowiska u-boota z poprawnym CRC.' % dev
-    return kopie.opis_menu(s[0], s[2])
+    return kopie.opis_menu(s[0], s[2], lista)
 
 
 def zapisz_settings():

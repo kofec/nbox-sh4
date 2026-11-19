@@ -120,6 +120,13 @@ def env_nor(zmienne, rozmiar):
     return struct.pack('<I', zlib.crc32(dane) & 0xffffffff) + dane
 
 
+def szablon_env(zmienne):
+    """Zestaw ENV2/ENV3 jak w NOR: CRC z dopelnieniem 0xff do 64 KB, w NOR tylko 16 KB."""
+    dane = b''.join(('%s=%s' % kv).encode('latin-1') + b'\0' for kv in zmienne) + b'\0'
+    dane = dane + b'\xff' * (0x10000 - 4 - len(dane))
+    return (struct.pack('<I', zlib.crc32(dane) & 0xffffffff) + dane)[:0x4000]
+
+
 CMDLINE = ('console=ttyAS0,115200 root=/dev/mtdblock0 rw rootfstype=jffs2 mem=128m '
            'nwhwconf=device:eth0,hwaddr:00:03:91:12:10:11 init=/bin/devinit')
 MENU_ENV = [
@@ -128,6 +135,8 @@ MENU_ENV = [
     ('ethaddr', '00:03:91:12:10:11'),
     ('bootdesc_1', 'Fb-uboot        '), ('bootcmd_1', 'run bootkern_1'),
     ('bootkern_1', 'protect off all; erase a02e0000 a02fffff; go a0206000'),
+    ('bootdesc_2', 'ENV2 BSLA+Hdd  '), ('bootcmd_2', 'run bootkern_2'),
+    ('bootkern_2', 'protect off all; erase a0260000 a026ffff; cp.b a02b4000 a0260000 4000; go a0280000'),
     ('bootdesc_3', 'USH1            '),
     ('bootcmd_3', 'set bootdesc_default 3; saveenv; run bootargs_3; run bootkern_3'),
     ('bootargs_3', 'set bootargs console=ttyAS0,115200 root=/dev/sdb1 rw rootdelay=6'),
@@ -143,7 +152,7 @@ MENU_ENV = [
 
 def zrzut_nor():
     """2 MB jak NOR boxa: szablon pod 0x40000 (bez bootargs), aktywne pod 0x60000,
-    zepsute CRC pod 0x70000."""
+    zepsute CRC pod 0x70000, zestawy ENV2/ENV3 pod 0xb4000/0xb8000."""
     d = bytearray(b'\xff' * 0x200000)
     szablon = env_nor([('bootdelay', '3'), ('baudrate', '115200'), ('board', 'mb442_27')], 0x8000)
     d[0x40000:0x48000] = szablon
@@ -151,6 +160,8 @@ def zrzut_nor():
     zle = bytearray(env_nor(MENU_ENV, 0x10000))
     zle[100] ^= 1
     d[0x70000:0x80000] = zle
+    d[0xb4000:0xb8000] = szablon_env([('bootcmd', 'bootmenu'), ('ethaddr', '00:03:91:12:22:22')])
+    d[0xb8000:0xbc000] = szablon_env([('bootcmd', 'bootmenu'), ('ethaddr', '00:03:91:12:23:33')])
     return bytes(d)
 
 
@@ -287,7 +298,8 @@ class Kopie(unittest.TestCase):
 
     def test_srodowiska_uboot(self):
         sr = kopie.srodowiska(zrzut_nor())
-        self.assertEqual([(o, r) for o, r, _ in sr], [(0x40000, 0x8000), (0x60000, 0x10000)])
+        self.assertEqual([(o, r) for o, r, _ in sr], [(0x40000, 0x8000), (0x60000, 0x10000),
+                                                        (0xb4000, 0x4000), (0xb8000, 0x10000)])  # za ENV3 same 0xff
         self.assertEqual(kopie.aktywne(sr, CMDLINE + '\n')[0], 0x60000)
         self.assertEqual(kopie.aktywne(sr, 'inna linia')[0], 0x60000)
         self.assertIsNone(kopie.aktywne(sr[:1], 'inna'))    # sam szablon: bez bootargs i bootcmd
@@ -298,7 +310,7 @@ class Kopie(unittest.TestCase):
     def test_menu_uboot(self):
         env = dict(MENU_ENV)
         m = kopie.menu_uboot(env)
-        self.assertEqual([p['nr'] for p in m], [1, 3, 8, 9])
+        self.assertEqual([p['nr'] for p in m], [1, 2, 3, 8, 9])
         p = dict((x['nr'], x) for x in m)
         self.assertTrue(p[8]['domyslna'])
         self.assertEqual(p[8]['skad'], 'NAND od 0x3c00000 (3 MB)')
@@ -306,12 +318,21 @@ class Kopie(unittest.TestCase):
         self.assertEqual(p[3]['skad'], 'USB 0:1 /boot/uImage')
         self.assertEqual(p[3]['root'], '/dev/sdb1')
         self.assertTrue(p[3]['zapamietuje'])
-        self.assertTrue(p[1]['kasuje_nor'])
+        self.assertEqual(p[1]['przelacza'], 'uboot')
+        self.assertEqual(p[1]['skad'], 'przejście do: u-boot Freebox')
+        self.assertEqual(p[2]['przelacza'], 'env')
+        self.assertIn('spod 0xb4000', p[2]['skad'])
+        self.assertIn('u-boot B4Team', p[2]['skad'])
+        self.assertEqual(p[8]['przelacza'], '')
+        sr = kopie.srodowiska(zrzut_nor())
+        self.assertIn('MAC 00:03:91:12:22:22', kopie.menu_uboot(env, sr)[1]['skad'])
         self.assertIn('update', p[9]['skad'])
         t = kopie.opis_menu(0x60000, env)
         self.assertIn('0x60000', t)
         self.assertIn('> 8  n-Fbox', t)
-        self.assertIn('KASUJE', t)
+        self.assertNotIn('KASUJE', t)
+        self.assertIn('u-B4', t)
+        self.assertIn('MAC 00:03:91:12:22:22', kopie.opis_menu(0x60000, env, sr))
         self.assertIn(CMDLINE, t)
 
 

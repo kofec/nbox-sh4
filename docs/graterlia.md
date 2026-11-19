@@ -227,11 +227,23 @@ boxie [sh4/nor_otp](../sh4/nor_otp/nor_otp.c) (tylko `O_RDONLY`) wypisuje
 
 - połowy 2 MB są identyczne — box ze zworką A20, początek zrzutu to adres CPU
   `0xA0200000`;
-- u-boot Freebox od `0x0`, drugi u-boot od `0x80000`;
-- **aktywne środowisko pod `0x60000`, 64 KB** (CRC32 + zmienne; CPU `a0260000`),
+- dwa u-booty z pakietu „Duo Multiboot v2 Multi MAC” (opis i pliki:
+  [jacektorun.pl](https://www.jacektorun.pl/Opisy_i_soft.html)): **Freebox** od `0x0`
+  i **B4Team** od `0x80000`. Pod `0xe0000` leży znacznik `u-b4` — z opisu pakietu i
+  zawartości NOR wynika, że Freebox po starcie skacze wtedy do B4Team;
+- **aktywne środowisko B4Team pod `0x60000`, 64 KB** (CRC32 + zmienne; CPU `a0260000`),
   `bootargs` takie jak w `/proc/cmdline`, menu `bootdesc_0..9`;
-- pod `0x40000`–`0x5c000` i `0xb4000`–`0xbc000` szablony środowiska z różnymi MAC-ami;
-  wpis menu „ENV2 BSLA+Hdd” kopiuje szablon spod `a02b4000` na `a0260000`;
+- pozycja menu **„Fb-uboot”** (`erase a02e0000 a02fffff; go a0206000`) kasuje znacznik
+  i przechodzi do u-boota Freebox — zostaje nim też po restarcie, powrót pozycją `u-B4`
+  w menu Freeboksa. To nie psuje NOR-a, tylko przełącza u-boot;
+- pozycja **„ENV2 …”** (`erase a0260000 a026ffff; cp.b a02b4000 a0260000 4000; go
+  a0280000`) wgrywa w miejsce aktywnego środowiska następny zestaw: ENV1 (`0xbc000`) →
+  ENV2 (`0xb4000`) → ENV3 (`0xb8000`) → ENV1. Zestawy mają inne menu i inny MAC (stąd
+  powtarzające się MAC-i na boxach z tym pakietem). CRC zestawu jest liczone tak, jak
+  będzie pod `0x60000`: 16 KB danych + `0xff` do 64 KB;
+- pod `0x40000`–`0x5c000` środowiska u-boota Freebox (menu `USbA`, `USHb`, `Hdd1..3`,
+  `NFS`, `Nand`, `u-b4` i `MAC1..3`, które przełączają je z MAC-ami `…85:01:01`,
+  `…85:02:02`, `…85:03:33`);
 - `0x140000`–`0x1e0000` to resztki oryginalnego oprogramowania ADB / nc+ (rejestr,
   certyfikaty), numeru seryjnego tam nie ma.
 

@@ -220,6 +220,16 @@ def srodowiska(dane, granica=0x200000):
                 if env:
                     wynik.append((off, r, env))
                 break
+        else:
+            # zestaw ENV2/ENV3 Duo Multiboot: 'cp.b a02b4000 a0260000 4000' na skasowane
+            # 64 KB, wiec CRC liczone z dopelnieniem 0xff, a nie z tym, co lezy dalej
+            for r in ROZMIARY_ENV[1:]:
+                if off + r <= koniec and zlib.crc32(
+                        dane[off + 4:off + r] + b'\xff' * (ROZMIARY_ENV[0] - r)) & 0xffffffff == crc:
+                    env = _zmienne(dane[off + 4:off + r])
+                    if env:
+                        wynik.append((off, r, env))
+                    break
     return wynik
 
 
@@ -240,11 +250,48 @@ def aktywne(srodowiska_lista, cmdline=''):
     return None
 
 
-def _skad(kern):
-    m = re.search(r'erase (\S+) ([^\s;]+)', kern)
-    if m:
-        g = re.search(r'\bgo ([^\s;]+)', kern)
-        return 'zapis NOR %s-%s%s' % (m.group(1), m.group(2), g and ', skok do %s' % g.group(1) or '')
+NOR_CPU = 0xa0000000
+NOR_POLOWA = 0x200000
+# Duo Multiboot v2 (jacektorun.pl): dwa u-booty w NOR. Freebox startuje pierwszy i
+# skacze do B4Team, gdy pod 0xe0000 jest znacznik "u-b4"; pozycja "Fb-uboot"
+# kasuje znacznik, wiec Freebox zostaje tez po restarcie (powrot: "u-B4").
+UBOOTY = {0x6000: 'Freebox', 0x80000: 'B4Team'}
+
+
+def _nor(adres):
+    """Adres CPU u-boota (a02b4000) -> offset w NOR; polowy 2 MB sa lustrem."""
+    return (int(adres, 16) - NOR_CPU) % NOR_POLOWA
+
+
+def _uboot(adres):
+    n = UBOOTY.get(_nor(adres))
+    return n and 'u-boot %s' % n or 'u-boot pod %s' % adres
+
+
+def _przelacza(kern):
+    """'uboot' - skok do innego u-boota, 'env' - zestaw ENV z szablonu, '' - start systemu."""
+    if 'erase ' not in kern or not re.search(r'\bgo ', kern):
+        return ''
+    return re.search(r'\bcp\.b ', kern) and 'env' or 'uboot'
+
+
+def _mac(lista, off):
+    for o, _, env in lista or ():
+        if o == off:
+            return env.get('ethaddr', '')
+    return ''
+
+
+def _skad(kern, lista=None):
+    rodzaj = _przelacza(kern)
+    if rodzaj:
+        ub = _uboot(re.search(r'\bgo ([^\s;]+)', kern).group(1))
+        if rodzaj == 'uboot':
+            return 'przejście do: %s' % ub
+        zrodlo = _nor(re.search(r'\bcp\.b ([^\s;]+)', kern).group(1))
+        mac = _mac(lista, zrodlo)
+        return 'zestaw ENV spod 0x%x%s zamiast obecnego, %s' % (
+            zrodlo, mac and ' (MAC %s)' % mac or '', ub)
     m = re.search(r'nand read(?:\.i)? \S+ (0x[0-9a-fA-F]+) (0x[0-9a-fA-F]+)', kern)
     if m:
         return 'NAND od %s (%d MB)' % (m.group(1), int(m.group(2), 16) // 0x100000)
@@ -258,8 +305,9 @@ def _skad(kern):
     return kern[:60]
 
 
-def menu_uboot(env):
-    """Pozycje menu z srodowiska: [dict nr, opis, domyslna, skad, root, zapamietuje, kasuje_nor, bootargs]."""
+def menu_uboot(env, lista=None):
+    """Pozycje menu z srodowiska: [dict nr, opis, domyslna, skad, root, zapamietuje, przelacza, bootargs].
+    lista - wszystkie srodowiska z NOR (MAC zestawu, na ktory przelacza pozycja ENV)."""
     nry = sorted(int(k[9:]) for k in env if re.match(r'bootdesc_\d+$', k))
     domyslna = env.get('bootdesc_default', '')
     wynik = []
@@ -274,28 +322,30 @@ def menu_uboot(env):
             'nr': n,
             'opis': env['bootdesc_%d' % n].strip(),
             'domyslna': str(n) == domyslna,
-            'skad': _skad(kern),
+            'skad': _skad(kern, lista),
             'root': m and m.group(1) or '',
             'zapamietuje': 'saveenv' in cmd,
-            'kasuje_nor': 'erase ' in kern,
+            'przelacza': _przelacza(kern),
             'bootargs': args,
         })
     return wynik
 
 
-def opis_menu(off, env):
+def opis_menu(off, env, lista=None):
     """Tekst ekranu z menu startowym."""
     t = ['Środowisko u-boota w NOR pod 0x%x (CRC poprawne)' % off,
          'Start: %s, %s s na wybór, domyślna pozycja %s; MAC %s' % (
              env.get('bootcmd', '?'), env.get('bootmenutimeout', env.get('bootdelay', '?')),
              env.get('bootdesc_default', '?'), env.get('ethaddr', '?')),
          '']
-    for p in menu_uboot(env):
+    for p in menu_uboot(env, lista):
         linia = '%s %d  %-16s %s' % (p['domyslna'] and '>' or ' ', p['nr'], p['opis'], p['skad'])
         if p['root']:
             linia += ', root=%s' % p['root']
-        if p['kasuje_nor']:
-            linia += '  [KASUJE CZĘŚĆ NOR - nie wybierać]'
+        if p['przelacza'] == 'uboot':
+            linia += '  (zostaje po restarcie, powrót: u-B4)'
+        elif p['przelacza'] == 'env':
+            linia += '  (zostaje po restarcie)'
         elif p['zapamietuje']:
             linia += '  (zostaje domyślna)'
         t.append(linia)

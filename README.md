@@ -198,7 +198,8 @@ ma, a ekran „Sprzęt” to mówi; MAC-a nie używamy, bo się powtarza.
   kopii, a wtyczka i skrypt ostrzegają, że kopia jest z innego boxa.
 - **Menu startowe u-boota**: pozycje menu ze środowiska u-boota w NOR (tylko odczyt;
   aktywne środowisko = to, którego `bootargs` są w `/proc/cmdline`), z oznaczeniem
-  domyślnej pozycji i tych, które kasują część NOR-a.
+  domyślnej pozycji i opisem pozycji, które przełączają u-boot (Freebox / B4Team)
+  albo zestaw środowiska z innym MAC-iem.
 
 ```sh
 docker run --rm -u $(id -u):$(id -g) -v "$PWD":/work -w /work/sh4/nor_otp nbox-sh4:4.8.4 \
