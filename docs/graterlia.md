@@ -191,6 +191,56 @@ ruszył. Start: wpis USB w menu u-boota (`ext2load usb 0:N a5000000 /boot/uImage
 Wpisy menu robią `saveenv`, więc wybór zostaje domyślny: **po wyjęciu pendrive'a box
 nie musi wrócić na NAND**, powrót to wybór wpisu strzałkami przy boxie (3 s).
 
+### NOR: u-boot, jego środowisko i numer kości
+
+nBox nie ma w systemie numeru seryjnego: `/proc/stb/info` mówi tylko `nbox`,
+rejestr `DEVICE_ID` STi7100 (`0x2D424041`) jest ten sam na każdym boxie, a MAC
+pochodzi z szablonów środowiska u-boota (pakiety „Multi MAC”), więc się powtarza.
+Wariant płyty (BSKA / BSLA / BXZB / BZZB) daje `/proc/boxtype`: `boxtype.ko` bada
+układy po I2C (STV6412, drugi STB0899, ID pierwszego STB0899), nie bierze go z
+parametru.
+
+Unikalny jest **fabryczny rejestr ochronny kości NOR**. W naszym boxie (BSLA) to ST
+M28W320 (`dmesg`: `Using word write for ST M28WXX0 FLASH`): 64 bity numeru wpisanego
+przez ST, zablokowane, i 64 bity OTP użytkownika. Numer zmieni się tylko przy wymianie
+kości. Graterlia NOR-a nie widzi (nie rejestruje go, a ma tylko `MTD_CFI_AMDSTD`,
+kość ma komendy Intela). Jądro `NAND=rw NOR=ro`
+([sh4/latki/nbox_nor_ro.patch](../sh4/latki/nbox_nor_ro.patch)) dodaje:
+
+- `mtd2` „nor”, 4 MB, **bez prawa zapisu** (`mask_flags = MTD_WRITEABLE`),
+  rejestrowany w `late_initcall`, czyli po NAND — `mtd0`/`mtd1` zostają jak w
+  Graterlii (przy zwykłej kolejności `physmap` dostałby `mtd0`);
+- `MTD_CFI_INTELEXT`, `MTD_CFI_ADV_OPTIONS`, `MTD_OTP` (ioctl `OTPSELECT`);
+- odrzucanie zapisu i blokady OTP użytkownika na partycji tylko do odczytu
+  (w 2.6.32 `mtdpart.c` tego nie sprawdza, a blokada jest nieodwracalna).
+
+```sh
+docker run --rm -v "$PWD":/work -e NAND=rw -e NOR=ro nbox-sh4:4.8.4 sh /work/sh4/zbuduj_jadro_printk.sh
+python3 sh4/mkimage_sh4.py build/jadro-nor/arch/sh/boot/vmlinux.bin.gz uImage-nand-rw-nor
+docker run --rm -v "$PWD":/work -w /work/sh4/nor_otp nbox-sh4:4.8.4 sh4-linux-gcc -O2 -Wall -o nor_otp nor_otp.c
+```
+
+Wgranie jak wyżej w [NAND](#nand) (`nandwrite -p /dev/mtd1 uImage-nand-rw-nor`). Na
+boxie [sh4/nor_otp](../sh4/nor_otp/nor_otp.c) (tylko `O_RDONLY`) wypisuje
+`fabryczny: <16 znaków hex>` — to identyfikator egzemplarza. `cat /dev/mtd2 >
+/hdd/nor.bin` daje zrzut całego NOR-a. W sprawdzonym boxie:
+
+- połowy 2 MB są identyczne — box ze zworką A20, początek zrzutu to adres CPU
+  `0xA0200000`;
+- u-boot Freebox od `0x0`, drugi u-boot od `0x80000`;
+- **aktywne środowisko pod `0x60000`, 64 KB** (CRC32 + zmienne; CPU `a0260000`),
+  `bootargs` takie jak w `/proc/cmdline`, menu `bootdesc_0..9`;
+- pod `0x40000`–`0x5c000` i `0xb4000`–`0xbc000` szablony środowiska z różnymi MAC-ami;
+  wpis menu „ENV2 BSLA+Hdd” kopiuje szablon spod `a02b4000` na `a0260000`;
+- `0x140000`–`0x1e0000` to resztki oryginalnego oprogramowania ADB / nc+ (rejestr,
+  certyfikaty), numeru seryjnego tam nie ma.
+
+`fw_printenv` z obrazu zadziała z `/etc/fw_env.config` o treści
+`/dev/mtd2 0x60000 0x10000 0x10000` — **offset sprawdź na swoim zrzucie**, inne
+u-booty (B4Team, bez zworki) mogą trzymać środowisko gdzie indziej. Zmiany środowiska
+rób z u-boota (konsola szeregowa albo wpis `UPDT` z `update.img` na pendrive), nie z
+Linuksa: to jądro i tak nie pozwala pisać do NOR-a.
+
 ## HDMI i CEC
 
 - `/sys/class/stmcoredisplay/hdmi0.0/hotplug` (`y`/`n`) działa także w

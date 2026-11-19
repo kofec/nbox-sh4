@@ -1,0 +1,71 @@
+diff -ru a/arch/sh/boards/mach-mb442/setup.c b/arch/sh/boards/mach-mb442/setup.c
+--- a/arch/sh/boards/mach-mb442/setup.c	2026-11-19 05:30:29.426934729 +0000
++++ b/arch/sh/boards/mach-mb442/setup.c	2026-11-19 05:30:29.490250253 +0000
+@@ -374,4 +374,46 @@
+ 	return platform_add_devices(iti_5800_devices, ARRAY_SIZE(iti_5800_devices));
+ }
+ device_initcall(iti_5800_device_init);
++
++/*
++ * NOR z u-bootem tylko do odczytu (latka nbox_nor_ro.patch). Cala kosc 4 MB
++ * jako jedna partycja bez MTD_WRITEABLE - jadro nie skasuje ani nie zapisze
++ * u-boota ani jego srodowiska. Rejestrowana w late_initcall, czyli po NAND
++ * (gen_nand probuje sie w device_initcall), wiec mtd0 = rootfs i mtd1 = kernel
++ * zostaja jak w Graterlii, a NOR to mtd2. Przy device_initcall physmap
++ * (drivers/mtd/maps przed drivers/mtd/nand) dostalby mtd0.
++ * Na boxach ze zworka A20 polowa okna to lustro drugiej polowy.
++ */
++static struct mtd_partition iti_5800_nor_ro_parts[] =
++{
++	{
++		.name       = "nor",
++		.offset     = 0,
++		.size       = MTDPART_SIZ_FULL,
++		.mask_flags = MTD_WRITEABLE,
++	},
++};
++
++static struct platform_device iti_5800_nor_ro_device =
++{
++	.name              = "physmap-flash",
++	.id                = -1,
++	.num_resources     = 1,
++	.resource          = (struct resource[])
++	{
++		STM_PLAT_RESOURCE_MEM(0, 4 * 1024 * 1024),
++	},
++	.dev.platform_data = &(struct physmap_flash_data)
++	{
++		.width         = 2,
++		.nr_parts      = ARRAY_SIZE(iti_5800_nor_ro_parts),
++		.parts         = iti_5800_nor_ro_parts,
++	},
++};
++
++static int __init iti_5800_nor_ro_init(void)
++{
++	return platform_device_register(&iti_5800_nor_ro_device);
++}
++late_initcall(iti_5800_nor_ro_init);
+ // vim:ts=4
+diff -ru a/drivers/mtd/mtdpart.c b/drivers/mtd/mtdpart.c
+--- a/drivers/mtd/mtdpart.c	2026-11-19 05:30:29.413762364 +0000
++++ b/drivers/mtd/mtdpart.c	2026-11-19 05:30:29.491140077 +0000
+@@ -221,6 +221,8 @@
+ 		size_t len, size_t *retlen, u_char *buf)
+ {
+ 	struct mtd_part *part = PART(mtd);
++	if (!(mtd->flags & MTD_WRITEABLE))  // nbox_nor_ro: OTP uzytkownika tez tylko do odczytu
++		return -EROFS;
+ 	return part->master->write_user_prot_reg(part->master, from,
+ 					len, retlen, buf);
+ }
+@@ -229,6 +231,8 @@
+ 		size_t len)
+ {
+ 	struct mtd_part *part = PART(mtd);
++	if (!(mtd->flags & MTD_WRITEABLE))  // nbox_nor_ro: blokada OTP jest nieodwracalna
++		return -EROFS;
+ 	return part->master->lock_user_prot_reg(part->master, from, len);
+ }
+ 

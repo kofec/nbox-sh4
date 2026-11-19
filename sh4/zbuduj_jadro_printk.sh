@@ -30,6 +30,14 @@
 # tablica zlych blokow w RAM-ie), a partycjom odbiera prawo zapisu (mask_flags).
 # NAND=rw to samo z zapisem, bez ROOT startuje z NAND i z pendrive'a (root= podaje
 # wpis u-boota). Drzewo w build/jadro-nand, reszta polecen bez zmian.
+#
+# NOR=ro (razem z NAND): latki/nbox_nor_ro.patch rejestruje kosc NOR z u-bootem
+# jako mtd2 "nor" (4 MB, bez MTD_WRITEABLE, po NAND w late_initcall) i blokuje
+# zapis/blokade OTP uzytkownika na partycjach tylko do odczytu. Do configu
+# dochodzi MTD_CFI_INTELEXT (kosci ST M28W320 maja komendy Intela, Graterlia ma
+# tylko AMDSTD), MTD_CFI_ADV_OPTIONS i MTD_OTP (ioctl OTPSELECT w mtdchar).
+# Po starcie: dmesg pokaze kosc, cat /dev/mtd2 da zrzut u-boota i srodowiska,
+# sh4/nor_otp odczyta fabryczny rejestr ochronny. Drzewo w build/jadro-nor.
 
 set -e
 
@@ -37,6 +45,11 @@ M="ARCH=sh CROSS_COMPILE=sh4-linux-"
 B=/work/build
 DST=$B/jadro-printk
 [ -z "$NAND" ] || DST=$B/jadro-nand
+if [ -n "$NOR" ]; then
+    [ "$NOR" = ro ] || { echo "NOR tylko ro"; exit 1; }
+    [ -n "$NAND" ] || { echo "NOR=ro wymaga NAND"; exit 1; }
+    DST=$B/jadro-nor
+fi
 
 [ -d "$B/linux-2.6.32.61_stm24_0217" ] || { echo "BRAK drzewa - najpierw przygotuj_jadro.sh"; exit 1; }
 # CONFIG_EXTRA_FIRMWARE_DIR="../integrated_firmware/" - wzgledem drzewa jadra
@@ -59,10 +72,21 @@ if [ "$NAND" = ro ]; then
     sed -i '/^static struct mtd_partition iti_5800_nand_parts/,/^};/ s/^\(\s*\)\.name.*$/&\n\1.mask_flags   = MTD_WRITEABLE,/' arch/sh/boards/mach-mb442/setup.c
     [ "$(grep -c 'mask_flags   = MTD_WRITEABLE' arch/sh/boards/mach-mb442/setup.c)" = 2 ] || { echo "BRAK mask_flags"; exit 1; }
 fi
+if [ -n "$NOR" ]; then
+    patch -p1 -i /work/sh4/latki/nbox_nor_ro.patch
+    sed -i -e 's/^# CONFIG_MTD_CFI_INTELEXT is not set/CONFIG_MTD_CFI_INTELEXT=y/' \
+           -e 's/^# CONFIG_MTD_CFI_ADV_OPTIONS is not set/CONFIG_MTD_CFI_ADV_OPTIONS=y/' .config
+fi
 yes "" | make $M oldconfig > "$B/jadro-printk-oldconfig.log" 2>&1
 sed -i 's/^# CONFIG_PRINTK_TIME is not set/CONFIG_PRINTK_TIME=y/' .config
+[ -z "$NOR" ] || sed -i 's/^# CONFIG_MTD_OTP is not set/CONFIG_MTD_OTP=y/' .config
 yes "" | make $M oldconfig >> "$B/jadro-printk-oldconfig.log" 2>&1
 grep -E "^CONFIG_PRINTK|^CONFIG_LOG_BUF|^CONFIG_CMDLINE" .config
+if [ -n "$NOR" ]; then
+    for o in MTD_CFI_INTELEXT MTD_CFI_ADV_OPTIONS MTD_OTP MTD_PHYSMAP MTD_CHAR; do
+        grep -q "^CONFIG_$o=y" .config || { echo "BRAK CONFIG_$o=y"; exit 1; }
+    done
+fi
 diff /work/sh4/config-graterlia-2.6.32.61_stm24_0217 .config | grep '^[<>] [A-Z#]' || true
 
 make -j"$(nproc)" $M vmlinux > "$B/jadro-printk.log" 2>&1 || { tail -30 "$B/jadro-printk.log"; exit 1; }
