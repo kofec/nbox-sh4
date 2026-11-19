@@ -1,0 +1,9 @@
+Package: enigma2-plugin-extensions-epgrefresh
+Version: @WERSJA@
+Description: EPGRefresh - refresh EPG in standby by zapping services (OpenPLi enigma2-plugins, Python 2), disabled by default
+Section: extra
+Priority: optional
+Maintainer: Kofec <18610805+kofec@users.noreply.github.com>
+Architecture: all
+Depends: enigma2
+Source: https://github.com/OpenPLi/enigma2-plugins/tree/479eeb18de51ebe344a139cbcfa46ec876585663/epgrefresh

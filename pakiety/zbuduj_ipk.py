@@ -10,6 +10,8 @@
 #                                          jako /usr/bin/nbox_kopia (zawsze)
 #   nbox-nor-otp                         - sh4/nor_otp (/usr/bin/nor_otp, id egzemplarza
 #                                          z kosci NOR; jadro z latki nbox_nor_ro.patch)
+#   enigma2-plugin-extensions-epgrefresh - enigma2/EPGRefresh, zrodlo OpenPLi bez zmian
+#                                          (zawsze; licencja CC BY-NC-SA, enigma2/EPGRefresh/LICENSE)
 #
 #   python pakiety/zbuduj_ipk.py [--nbox-ko SCIEZKA/nbox_cec.ko] [--ko SCIEZKA/cec_rx.ko]
 #                                [--nor-otp SCIEZKA/nor_otp] [--wyj KATALOG]
@@ -41,6 +43,11 @@ PLIKI_NCPL = ('__init__.py', 'si.py', 'lamedb.py', 'budowa.py', 'scalanie.py', '
 KOPIA = os.path.join(REPO, 'enigma2', 'NBoxKopia')
 CEL_KOPII = 'usr/lib/enigma2/python/Plugins/SystemPlugins/NBoxKopia'
 KOPIA_SH = os.path.join(REPO, 'skrypty', 'nbox_kopia.sh')
+EPGR = os.path.join(REPO, 'enigma2', 'EPGRefresh')
+CEL_EPGR = 'usr/lib/enigma2/python/Plugins/Extensions/EPGRefresh'
+# OpenPLi/enigma2-plugins, galaz master (ostatnia z Pythonem 2), epgrefresh 1.5-git
+WERSJA_EPGR = '1.5+git479eeb1'
+BINARNE_EPGR = ('plugin.png',)
 VERMAGIC = b'vermagic=2.6.32.61_stm24_0217 preempt mod_unload SH4LE'
 WERSJA_NOR_OTP = '1.0'
 ELF_SH = 42                     # e_machine EM_SH
@@ -184,6 +191,16 @@ def main():
         (CEL_KOPII + '/' + n, tekst(os.path.join(KOPIA, n)), 0o644)
         for n in ('__init__.py', 'kopie.py', 'plugin.py')
     ] + [('usr/bin/nbox_kopia', tekst(KOPIA_SH), 0o755)], wersja_wtyczki(KOPIA), a.wyj, a.mtime)
+    pliki_epgr = []
+    for n in sorted(os.listdir(EPGR)):
+        p = os.path.join(EPGR, n)
+        if n in BINARNE_EPGR:
+            with open(p, 'rb') as f:
+                pliki_epgr.append((CEL_EPGR + '/' + n, f.read(), 0o644))
+        elif n.endswith(('.py', '.xml', '.info')) or n == 'LICENSE':
+            pliki_epgr.append((CEL_EPGR + '/' + n, tekst(p), 0o644))
+    ipk(os.path.join(PAKIETY, 'enigma2-plugin-extensions-epgrefresh'), pliki_epgr,
+        WERSJA_EPGR, a.wyj, a.mtime)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# skompilowane stare wersje - enigma zbuduje nowe przy starcie
+rm -f /usr/lib/enigma2/python/Plugins/Extensions/EPGRefresh/*.pyo \
+	/usr/lib/enigma2/python/Plugins/Extensions/EPGRefresh/*.pyc
+echo "EPGRefresh: zrestartuj enigme (menu albo OpenWebif /web/powerstate?newstate=3)"
+echo "EPGRefresh: domyslnie wylaczony - wlaczyc i wybrac kanaly w menu wtyczek"
+
+exit 0
