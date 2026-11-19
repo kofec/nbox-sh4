@@ -643,7 +643,7 @@ class Calosc(unittest.TestCase):
     def test_plik_hw(self):
         tmp = tempfile.mkdtemp()
         try:
-            id1, id2 = '2d084c4c587fda55', '1111222233334444'
+            id1, id2 = '0123456789abcdef', '1111222233334444'
             hw1, hw2 = 'nbox_HW_%s.txt' % id1, 'nbox_HW_%s.txt' % id2
             with open(SKRYPT_SH, 'rb') as f:
                 tresc = f.read().replace(b'\r\n', b'\n')
